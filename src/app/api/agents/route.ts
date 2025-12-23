@@ -2,9 +2,23 @@ import { NextResponse } from 'next/server';
 import { enqueueTask } from '../../../lib/queue';
 import { logEvent } from '../../../lib/audit';
 import { emitSandboxLog } from '../../../lib/sandbox-logs';
+import { checkRateLimit, rateLimitResponse, RATE_LIMIT_PRESETS } from '../../../lib/rate-limit';
+import { agentsRequestSchema, validateRequest, validationErrorResponse } from '../../../lib/schemas';
 
 export async function POST(req: Request) {
+  // Rate limiting (strict for expensive LLM operations)
+  const rateLimitResult = await checkRateLimit(req, { ...RATE_LIMIT_PRESETS.strict, keyPrefix: 'agents' });
+  if (!rateLimitResult.allowed) {
+    return rateLimitResponse(rateLimitResult.resetAt);
+  }
+
   const body = await req.json();
+
+  // Validate request body
+  const validation = validateRequest(agentsRequestSchema, body);
+  if (!validation.success) {
+    return validationErrorResponse(validation.error, validation.details);
+  }
 
   // Suporta: { role, payload } ou { role: 'orchestrate', request, context }
   if (!body?.role) {

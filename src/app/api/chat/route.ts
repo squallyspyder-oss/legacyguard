@@ -1,18 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runChat } from '@/agents/chat';
+import { checkRateLimit, rateLimitResponse, RATE_LIMIT_PRESETS } from '@/lib/rate-limit';
+import { chatRequestSchema, validateRequest, validationErrorResponse } from '@/lib/schemas';
 
 export async function POST(req: NextRequest) {
+  // Rate limiting (standard for chat)
+  const rateLimitResult = await checkRateLimit(req, { ...RATE_LIMIT_PRESETS.standard, keyPrefix: 'chat' });
+  if (!rateLimitResult.allowed) {
+    return rateLimitResponse(rateLimitResult.resetAt);
+  }
+
   try {
     const body = await req.json();
-    const message: string = body?.message || '';
-    if (!message.trim()) {
-      return NextResponse.json({ error: 'Mensagem vazia' }, { status: 400 });
+
+    // Validate request
+    const validation = validateRequest(chatRequestSchema, body);
+    if (!validation.success) {
+      return validationErrorResponse(validation.error, validation.details);
     }
 
-    const deep = Boolean(body?.deep);
-    const repoPath = body?.repoPath as string | undefined;
+    const { message, deepSearch: deep, context } = validation.data;
+    const repoPath = (context as any)?.repoPath as string | undefined;
 
-    const result = await runChat({ message, deep, repoPath });
+    const result = await runChat({ message, deep: deep || false, repoPath });
 
     return NextResponse.json({
       reply: result.reply,

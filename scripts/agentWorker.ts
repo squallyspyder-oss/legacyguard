@@ -1,4 +1,15 @@
-import { connectRedis, ensureGroup, readGroup, ack, enqueueTask } from '../src/lib/queue';
+import {
+  connectRedis,
+  ensureGroup,
+  readGroup,
+  ack,
+  enqueueTask,
+  requeueForRetry,
+  getRetryInfo,
+  readPending,
+  DLQ_STREAM,
+  DEFAULT_RETRY_CONFIG,
+} from '../src/lib/queue';
 import { runAdvisor } from '../src/agents/advisor';
 import { runOperator } from '../src/agents/operator';
 import { runExecutor } from '../src/agents/executor';
@@ -161,8 +172,29 @@ async function main() {
             // Publicar resultado
             await publishResult(id, { role: data.role, outcome, elapsed });
           } catch (err: any) {
-            console.error(`❌ Tarefa falhou:`, err.message || err);
-            await publishResult(id, { role: data.role, error: err.message || String(err) });
+            const errorMsg = err.message || String(err);
+            console.error(`❌ Tarefa falhou:`, errorMsg);
+
+            // Retry logic with exponential backoff
+            const { attempt } = getRetryInfo(data);
+            const retryResult = await requeueForRetry(stream, data, errorMsg, DEFAULT_RETRY_CONFIG);
+
+            if (retryResult.requeued) {
+              console.log(`🔄 Retry ${retryResult.attempt}/${DEFAULT_RETRY_CONFIG.maxRetries} scheduled`);
+              await publishResult(id, {
+                role: data.role,
+                error: errorMsg,
+                retry: { attempt: retryResult.attempt, nextDelayMs: retryResult.nextDelayMs },
+              });
+            } else {
+              console.error(`💀 Task moved to DLQ after ${retryResult.attempt} attempts`);
+              await publishResult(id, {
+                role: data.role,
+                error: errorMsg,
+                dlq: true,
+                finalAttempt: retryResult.attempt,
+              });
+            }
           }
 
           await ack(stream, group, id);

@@ -34,12 +34,41 @@ const inMemoryLogs: Array<AuditLogInput & { id: number; created_at: string }> = 
 const inMemoryArtifacts: Array<AuditArtifactInput & { id: number; created_at: string }> = [];
 let memoryId = 1;
 
+// Track if warning was already logged
+let dbWarningLogged = false;
+
 function getPool() {
   if (pool) return pool;
   const url = process.env.AUDIT_DB_URL || process.env.PGVECTOR_URL;
-  if (!url) return null; // fallback em memória quando DB não configurado
+  if (!url) {
+    // Fallback to in-memory - warn in production
+    if (!dbWarningLogged && process.env.NODE_ENV === 'production') {
+      console.warn(
+        '⚠️  [AUDIT] AUDIT_DB_URL not configured! Audit logs are stored in-memory and will be LOST on restart.\n' +
+        '    Set AUDIT_DB_URL or PGVECTOR_URL environment variable for persistent audit logging.'
+      );
+      dbWarningLogged = true;
+    }
+    return null;
+  }
   pool = new Pool({ connectionString: url });
   return pool;
+}
+
+/** Check if audit is using persistent storage */
+export function isAuditPersistent(): boolean {
+  return !!(process.env.AUDIT_DB_URL || process.env.PGVECTOR_URL);
+}
+
+/** Get audit storage status for health checks */
+export function getAuditStorageStatus(): { persistent: boolean; warning?: string } {
+  const persistent = isAuditPersistent();
+  return {
+    persistent,
+    warning: persistent
+      ? undefined
+      : 'Audit logs are stored in-memory. Configure AUDIT_DB_URL for persistence.',
+  };
 }
 
 async function ensureSchema() {
