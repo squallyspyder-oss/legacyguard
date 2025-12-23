@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+:root {
+  --background: #05080f;
+  --foreground: #e8edf7;
+  --accent: #5eead4;
+  --accent-2: #a855f7;
+  --muted: #8fa2c3;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: radial-gradient(circle at 20% 20%, rgba(94, 234, 212, 0.12), transparent 26%),
+    radial-gradient(circle at 80% 10%, rgba(168, 85, 247, 0.18), transparent 32%),
+    radial-gradient(circle at 40% 80%, rgba(59, 130, 246, 0.1), transparent 30%),
+    #05080f;
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), 'Inter', system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgba(94, 234, 212, 0.25);
+  color: var(--foreground);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(94, 234, 212, 0.35);
+  border-radius: 999px;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+}

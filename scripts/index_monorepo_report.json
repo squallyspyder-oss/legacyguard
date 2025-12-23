@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-12-21T04:59:38.411Z",
+  "reports": [
+    {
+      "root": "C:\\legacyguard",
+      "files": 2000,
+      "nodes": 2000,
+      "edges": 1567,
+      "vectorUpserted": 0
+    }
+  ]
+}

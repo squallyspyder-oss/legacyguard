@@ -1,0 +1,46 @@
+import { NextRequest, NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import archiver from 'archiver';
+
+export async function POST(req: NextRequest) {
+  const { patch } = await req.json();
+
+  if (!patch || !patch.file || (!patch.original && !patch.fixed)) {
+    return NextResponse.json({ error: 'Patch inválido' }, { status: 400 });
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'legacyguard-apply-'));
+
+  try {
+    const filePath = path.join(tempDir, patch.file);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+
+    // Usa o código corrigido (fixed) como base
+    fs.writeFileSync(filePath, patch.fixed || patch.original || '// Arquivo vazio');
+
+    // ZIP do projeto corrigido
+    const zipPath = path.join(tempDir, 'projeto-corrigido.zip');
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    output.on('close', () => {});
+    archive.pipe(output);
+    archive.directory(tempDir, false);
+    await archive.finalize();
+
+    const zipBuffer = fs.readFileSync(zipPath);
+
+    return new NextResponse(zipBuffer, {
+      headers: {
+        'Content-Type': 'application/zip',
+        'Content-Disposition': 'attachment; filename="projeto-corrigido.zip"',
+      },
+    });
+  } catch (error) {
+    return NextResponse.json({ error: 'Falha ao gerar ZIP' }, { status: 500 });
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
