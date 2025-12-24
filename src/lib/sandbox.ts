@@ -146,6 +146,8 @@ async function findTestCommand(repoPath: string, languageHint?: string): Promise
 
 // Check if Docker is available
 async function isDockerAvailable(): Promise<boolean> {
+  // Developer override: force Docker available for local testing without Docker/Wsl
+  if (process.env.LEGACYGUARD_FORCE_DOCKER === 'true') return true;
   try {
     await execAsync('docker version --format "{{.Server.Version}}"');
     return true;
@@ -492,7 +494,7 @@ export async function getSandboxCapabilities(): Promise<{
   shell: boolean;
   recommended: 'docker' | 'shell' | 'native';
 }> {
-  const docker = await isDockerAvailable();
+  const docker = process.env.LEGACYGUARD_FORCE_DOCKER === 'true' ? true : await isDockerAvailable();
   const shell = process.platform !== 'win32';
 
   return {
