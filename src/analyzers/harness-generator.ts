@@ -12,6 +12,10 @@ export type HarnessSuggestion = {
 export type HarnessPack = {
   fixtures: Array<{ name: string; input: any }>;
   commands: HarnessSuggestion[];
+  setup?: string[];
+  teardown?: string[];
+  env?: Record<string, string>;
+  workdir?: string;
 };
 
 export function generateHarness(profile: LegacyProfile, behavior: BehaviorClassification, incident: IncidentAlert): HarnessPack {

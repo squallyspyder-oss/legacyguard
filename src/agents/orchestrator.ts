@@ -13,7 +13,7 @@ import { analyzeImpact } from '../lib/impact';
 import { emitSandboxLog } from '../lib/sandbox-logs';
 import { startIncidentCycle, markMitigation, recordRegression } from '../lib/metrics';
 import { logEvent } from '../lib/audit';
-import { runSandbox, SandboxResult, getSandboxCapabilities } from '../lib/sandbox';
+import { runSandbox, SandboxResult, getSandboxCapabilities, HarnessCommands } from '../lib/sandbox';
 
 const execFileAsync = promisify(execFile);
 
@@ -21,7 +21,8 @@ type SandboxConfig = {
   enabled?: boolean;
   repoPath?: string;
   command?: string;
-  commands?: Array<{ name: string; command: string; notes?: string }>; // Harness commands from Twin
+  commands?: string[]; // Harness commands from Twin
+  harnessCommands?: HarnessCommands;
   runnerPath?: string;
   timeoutMs?: number;
   failMode?: 'fail' | 'warn'; // fail = abort executor; warn = log and continuar
@@ -155,9 +156,9 @@ export class Orchestrator {
           this.log(`   🔧 Harness: ${twinResult.harness.commands.length} comandos sugeridos`);
           // Enriquecer sandbox config com harness commands
           if (this.taskContext.sandbox) {
-            this.taskContext.sandbox.commands = twinResult.harness.commands;
+            this.taskContext.sandbox.commands = twinResult.harness.commands.map(c => c.command);
             this.taskContext.sandbox.harnessCommands = {
-              run: twinResult.harness.commands,
+              run: twinResult.harness.commands.map(c => c.command),
               setup: twinResult.harness.setup || [],
               teardown: twinResult.harness.teardown || [],
               env: twinResult.harness.env,
@@ -393,6 +394,7 @@ export class Orchestrator {
           await this.runSandboxIfEnabled(task);
           result.output = await runOperator({
             ...this.taskContext,
+            repoPath: this.taskContext.repoPath,
             action: task.description,
             dependencyContext: depContext,
           });
@@ -406,6 +408,10 @@ export class Orchestrator {
           await this.runSandboxIfEnabled(task);
           result.output = await runExecutor({
             ...this.taskContext,
+            owner: this.taskContext.owner,
+            repo: this.taskContext.repo,
+            prNumber: this.taskContext.prNumber,
+            token: this.taskContext.token,
             action: task.description,
             dependencyContext: depContext,
           });

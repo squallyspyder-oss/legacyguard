@@ -17,6 +17,8 @@ import { runReviewer } from '../src/agents/reviewer';
 import { createOrchestrator, OrchestrationState } from '../src/agents/orchestrator';
 import { consumeReservation, refundReservation } from '../src/lib/quotas';
 
+type StreamReadResult = Array<[string, Array<[string, string[]]>]>;
+
 // Stream para resultados (feedback loop)
 const RESULTS_STREAM = 'agent-results';
 
@@ -113,7 +115,7 @@ async function main() {
 
   while (true) {
     try {
-      const res = await readGroup(stream, group, consumer, 1, 5000);
+      const res = (await readGroup(stream, group, consumer, 1, 5000)) as StreamReadResult | null;
       if (!res) continue;
 
       for (const [, items] of res) {

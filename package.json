@@ -17,6 +17,7 @@
   "dependencies": {
     "archiver": "^7.0.1",
     "dotenv": "^17.2.3",
+    "geist": "^1.5.1",
     "ioredis": "^5.8.2",
     "jszip": "^3.10.0",
     "next": "16.1.0",

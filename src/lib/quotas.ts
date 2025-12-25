@@ -169,7 +169,13 @@ export async function enforceQuota(params: {
     const nextTokens = prev.tokensUsed + tokens;
     const allowed = limits.hardCap ? nextTokens <= limits.monthlyTokens : true;
     if (!allowed) {
-      return { allowed: false, reason: 'quota_exceeded', tokensLimit: limits.monthlyTokens, tokensUsed: prev.tokensUsed };
+      return {
+        allowed: false,
+        reason: 'quota_exceeded',
+        tokensLimit: limits.monthlyTokens,
+        tokensUsed: prev.tokensUsed,
+        planId,
+      };
     }
     memoryUsage.set(key, { tokensUsed: nextTokens, usdUsed: prev.usdUsed + cost.usd });
     return { allowed: true, planId, tokensUsed: nextTokens, usdUsed: prev.usdUsed + cost.usd };
@@ -190,16 +196,17 @@ export async function enforceQuota(params: {
 
     const row = res.rows[0];
     const allowed = limits.hardCap ? Number(row.tokens_used) <= limits.monthlyTokens : true;
-    if (!allowed) {
-      await client.query('ROLLBACK');
-      return {
-        allowed: false,
-        reason: 'quota_exceeded',
-        tokensUsed: Number(row.tokens_used),
-        usdUsed: Number(row.usd_used),
-        tokensLimit: limits.monthlyTokens,
-      };
-    }
+      if (!allowed) {
+        await client.query('ROLLBACK');
+        return {
+          allowed: false,
+          reason: 'quota_exceeded',
+          tokensUsed: Number(row.tokens_used),
+          usdUsed: Number(row.usd_used),
+          tokensLimit: limits.monthlyTokens,
+          planId,
+        };
+      }
     await client.query('COMMIT');
     // record daily rollup
     try {
