@@ -64,7 +64,7 @@ export async function enqueueTask(stream: string, data: Record<string, any>) {
 export async function readGroup(stream: string, group: string, consumer: string, count = 1, block = 5000) {
   const r = connectRedis();
   // XREADGROUP GROUP <group> <consumer> BLOCK <ms> COUNT <count> STREAMS <stream> >
-  const res = await r.xreadgroup('GROUP', group, consumer, 'BLOCK', block, 'COUNT', count, 'STREAMS', stream, '>');
+  const res = await (r as any).xreadgroup('GROUP', group, consumer, 'BLOCK', block, 'COUNT', count, 'STREAMS', stream, '>');
   return res; // raw response to be parsed by caller
 }
 
@@ -135,7 +135,7 @@ export async function sendToDLQ(
   data: Record<string, any>,
   error: string,
   finalAttempt: number
-): Promise<string> {
+): Promise<string | null> {
   const dlqEntry = {
     ...data,
     _dlqReason: error,

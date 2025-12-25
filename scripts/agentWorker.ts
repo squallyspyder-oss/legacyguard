@@ -114,9 +114,10 @@ async function main() {
   while (true) {
     try {
       const res = await readGroup(stream, group, consumer, 1, 5000);
-      if (!res) continue;
+      if (!res || !Array.isArray(res)) continue;
+      const entries = res as [string, Array<[string, string[]]>][];
 
-      for (const [, items] of res) {
+      for (const [, items] of entries) {
         for (const [id, pairs] of items) {
           const data: any = {};
           for (let i = 0; i < pairs.length; i += 2) {
