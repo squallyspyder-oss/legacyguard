@@ -118,6 +118,7 @@ async function main() {
       const entries = res as [string, Array<[string, string[]]>][];
 
       for (const [, items] of entries) {
+        if (!Array.isArray(items)) continue;
         for (const [id, pairs] of items) {
           const data: any = {};
           for (let i = 0; i < pairs.length; i += 2) {

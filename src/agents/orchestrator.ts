@@ -156,15 +156,19 @@ export class Orchestrator {
           this.log(`   🔧 Harness: ${twinResult.harness.commands.length} comandos sugeridos`);
           // Enriquecer sandbox config com harness commands
           if (this.taskContext.sandbox) {
-            const harnessCommands = twinResult.harness.commands.map(cmd => cmd.command);
-            this.taskContext.sandbox.commands = harnessCommands;
-            this.taskContext.sandbox.harnessCommands = {
-              run: harnessCommands,
-              setup: twinResult.harness.setup || [],
-              teardown: twinResult.harness.teardown || [],
-              env: twinResult.harness.env,
-              workdir: twinResult.harness.workdir,
-            };
+            const harnessCommands = twinResult.harness.commands
+              .map(cmd => cmd.command)
+              .filter((cmd): cmd is string => Boolean(cmd));
+            if (harnessCommands.length) {
+              this.taskContext.sandbox.commands = harnessCommands;
+              this.taskContext.sandbox.harnessCommands = {
+                run: harnessCommands,
+                setup: twinResult.harness.setup || [],
+                teardown: twinResult.harness.teardown || [],
+                env: twinResult.harness.env,
+                workdir: twinResult.harness.workdir,
+              };
+            }
           }
         }
 
@@ -407,12 +411,16 @@ export class Orchestrator {
             throw new Error('Safe mode habilitado: executor bloqueado');
           }
           await this.runSandboxIfEnabled(task);
+          const { owner, repo, prNumber, token } = this.taskContext;
+          if (!owner || !repo || !prNumber || !token) {
+            throw new Error('Executor requer owner, repo, prNumber e token');
+          }
           result.output = await runExecutor({
             ...this.taskContext,
-            owner: this.taskContext.owner || '',
-            repo: this.taskContext.repo || '',
-            prNumber: this.taskContext.prNumber || 0,
-            token: this.taskContext.token || '',
+            owner,
+            repo,
+            prNumber,
+            token,
             action: task.description,
             dependencyContext: depContext,
           });
