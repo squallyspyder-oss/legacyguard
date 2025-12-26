@@ -1,12 +1,22 @@
 // Cross-platform sandbox runner using Docker API
 // Falls back to shell script on Linux when available
 
-import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
+let spawn: any;
+let exec: any;
+function ensureChildProcess() {
+  if (!spawn || !exec) {
+    // Dynamically require to avoid bundlers/edge runtimes pulling in child_process at build time
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const cp = require('child_process');
+    spawn = cp.spawn;
+    exec = cp.exec;
+  }
+}
 import path from 'path';
 import fs from 'fs';
 
-const execAsync = promisify(exec);
+// execAsync will be created on-demand via ensureChildProcess()
 
 // Harness commands from Twin Builder
 export type HarnessCommands = {
@@ -149,6 +159,8 @@ async function isDockerAvailable(): Promise<boolean> {
   // Developer override: force Docker available for local testing without Docker/Wsl
   if (process.env.LEGACYGUARD_FORCE_DOCKER === 'true') return true;
   try {
+    ensureChildProcess();
+    const execAsync = promisify(exec);
     await execAsync('docker version --format "{{.Server.Version}}"');
     return true;
   } catch {
@@ -247,6 +259,7 @@ async function runDockerSandbox(config: SandboxConfig): Promise<SandboxResult> {
     let stdout = '';
     let stderr = '';
     let killed = false;
+    ensureChildProcess();
 
     const proc = spawn('docker', args, {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -321,6 +334,8 @@ async function runShellSandbox(config: SandboxConfig): Promise<SandboxResult> {
       SANDBOX_TIMEOUT_MS: String(config.timeoutMs || 300000),
     };
 
+    ensureChildProcess();
+
     const proc = spawn('bash', [runnerPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
       env,
@@ -391,6 +406,8 @@ async function runNativeSandbox(config: SandboxConfig): Promise<SandboxResult> {
     const shell = isWindows ? 'cmd.exe' : '/bin/sh';
     const shellArgs = isWindows ? ['/c', command] : ['-c', command];
 
+    ensureChildProcess();
+
     const proc = spawn(shell, shellArgs, {
       cwd: config.repoPath,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -449,7 +466,20 @@ async function runNativeSandbox(config: SandboxConfig): Promise<SandboxResult> {
 // Main sandbox runner
 export async function runSandbox(config: SandboxConfig): Promise<SandboxResult> {
   const log = config.onLog || console.log;
-
+  
+  // Prevent sandbox execution in restricted hosting environments (like Vercel).
+  // Vercel does not allow spawning Docker or long-running host processes — force-disable unless explicitly forced.
+  if (process.env.VERCEL && process.env.LEGACYGUARD_FORCE_DOCKER !== 'true') {
+    log('[Sandbox] Running on Vercel — sandbox disabled for safety');
+    return {
+      success: true,
+      exitCode: 0,
+      stdout: 'Sandbox disabled on Vercel',
+      stderr: '',
+      durationMs: 0,
+      method: 'native',
+    };
+  }
   if (!config.enabled) {
     log('[Sandbox] Disabled, skipping');
     return {

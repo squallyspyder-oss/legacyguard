@@ -2,7 +2,6 @@
 import path from 'path';
 import fs from 'fs';
 import { promisify } from 'util';
-import { execFile } from 'child_process';
 import { runPlanner, Plan, SubTask, getExecutionOrder } from './planner';
 import { runAdvisor } from './advisor';
 import { runOperator } from './operator';
@@ -15,7 +14,7 @@ import { startIncidentCycle, markMitigation, recordRegression } from '../lib/met
 import { logEvent } from '../lib/audit';
 import { runSandbox, SandboxResult, getSandboxCapabilities } from '../lib/sandbox';
 
-const execFileAsync = promisify(execFile);
+// execFile usage removed to avoid bundling native child_process in serverless/runtime
 
 type SandboxConfig = {
   enabled?: boolean;

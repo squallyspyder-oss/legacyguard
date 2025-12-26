@@ -1,7 +1,11 @@
 import path from 'path';
 import fs from 'fs/promises';
 import fssync from 'fs';
-import { execFile } from 'child_process';
+function getExecFile() {
+  // Dynamically require to avoid bundling child_process in serverless/edge builds
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return require('child_process').execFile;
+}
 import { emitSandboxLog } from '../lib/sandbox-logs';
 import { startIncidentCycle } from '../lib/metrics';
 import { logEvent } from '../lib/audit';
@@ -260,9 +264,15 @@ async function execSandbox(runnerPath: string, repoPath: string, command: string
   const repoPathForRunner = toDockerPath(repoPath);
   log(taskId, `Executando runner sandbox: ${runnerPath} (${command})`, 'sandbox');
 
+  if (process.env.VERCEL) {
+    log(taskId, 'ExecSandbox pulado no ambiente Vercel (sem suporte a Docker/processos nativos)', 'sandbox');
+    if (failMode === 'fail') throw new Error('Sandbox não suportado em Vercel');
+    return;
+  }
+
   try {
     await new Promise<void>((resolve, reject) => {
-      const child = execFile('bash', [runnerPath, repoPathForRunner, command], { timeout: 10 * 60 * 1000 }, (err, stdout, stderr) => {
+      const child = getExecFile()('bash', [runnerPath, repoPathForRunner, command], { timeout: 10 * 60 * 1000 }, (err, stdout, stderr) => {
         if (stdout) log(taskId, `Sandbox stdout: ${stdout.slice(0, 1000)}`, 'sandbox');
         if (stderr) log(taskId, `Sandbox stderr: ${stderr.slice(0, 1000)}`, 'sandbox');
         if (err) {
