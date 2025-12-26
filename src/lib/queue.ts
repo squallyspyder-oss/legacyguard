@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+import { getRedisUrl } from './config';
 
 let redisClient: Redis | null = null;
 
@@ -25,7 +26,8 @@ export const DLQ_STREAM = 'agents-dlq';
 
 export function connectRedis(url?: string) {
   if (redisClient) return redisClient;
-  redisClient = new Redis(url || process.env.REDIS_URL || 'redis://127.0.0.1:6379');
+  const target = url || getRedisUrl();
+  redisClient = new Redis(target);
   redisClient.on('error', (err) => console.error('Redis error', err));
   return redisClient;
 }
