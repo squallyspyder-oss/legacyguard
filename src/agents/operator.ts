@@ -37,7 +37,7 @@ FORMATO DE RESPOSTA (JSON):
 }`;
 
 export type OperatorInput = {
-  repoPath: string;
+  repoPath?: string;
   branchName?: string;
   patch?: string;
   patchFile?: string;
@@ -68,7 +68,8 @@ export type OperatorOutput = {
 };
 
 export async function runOperator(task: OperatorInput): Promise<OperatorOutput> {
-  const git: SimpleGit = simpleGit(task.repoPath);
+  const repoPath = task.repoPath || process.cwd();
+  const git: SimpleGit = simpleGit(repoPath);
   const llmEnabled = Boolean(process.env.OPENAI_API_KEY);
   
   // Determinar nome do branch
@@ -103,7 +104,7 @@ export async function runOperator(task: OperatorInput): Promise<OperatorOutput> 
   // Verificar se há testes no repo
   const testDirs = ['tests', 'test', '__tests__', 'spec'];
   for (const dir of testDirs) {
-    if (fs.existsSync(path.join(task.repoPath, dir))) {
+    if (fs.existsSync(path.join(repoPath, dir))) {
       validations.hasTests = true;
       break;
     }
