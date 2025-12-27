@@ -14,6 +14,7 @@ import { emitSandboxLog } from '../lib/sandbox-logs';
 import { startIncidentCycle, markMitigation, recordRegression } from '../lib/metrics';
 import { logEvent } from '../lib/audit';
 import { runSandbox, SandboxResult, getSandboxCapabilities } from '../lib/sandbox';
+import type { HarnessCommands } from '../lib/sandbox';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,6 +34,7 @@ type SandboxConfig = {
   memoryLimit?: string;
   cpuLimit?: string;
   tmpfsSizeMb?: number;
+  harnessCommands?: HarnessCommands; // commands provided by Twin Builder
 };
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'awaiting-approval';
