@@ -30,8 +30,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (explicitly ignore local secrets, keep example files)
+# ignore local .env and rendered env file but allow .env.example
+.env
+.env.local
+.env.*.local
+.env.render
 
 # vercel
 .vercel

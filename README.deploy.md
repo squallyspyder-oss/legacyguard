@@ -1,73 +1,88 @@
-# Deploy e provisionamento (Vercel + serviços externos)
+# Deploy e provisionamento (Render + serviços externos)
 
-Este documento descreve os passos mínimos para provisionar os serviços externos que `legacyguard` precisa e como conectar ao Vercel.
+Este documento descreve os passos mínimos para provisionar os serviços externos que `legacyguard` precisa e como implantar no Render.
 
-1) Criar projeto no Vercel
+1) Criar serviços no Render
 
-- Instale a CLI (opcional):
+- Acesse https://dashboard.render.com e crie um workspace/projeto se ainda não tiver.
+- Crie dois serviços:
+  - `legacyguard-web` — tipo `Web Service` (Node). Configure o comando de build `npm ci && npm run build` e start `npm run start`.
+  - `legacyguard-worker` — tipo `Background Worker` ou `Docker` (se preferir usar `Dockerfile.worker`).
+
+Você também pode criar os serviços via Render CLI:
 
 ```bash
-npm i -g vercel
-vercel login
-vercel link
+# exemplo (ajuste flags conforme necessidade):
+render services create --name legacyguard-web --env node --region oregon --branch main --build-command "npm ci && npm run build" --start-command "npm run start"
+render services create --name legacyguard-worker --env docker --region oregon --branch main --dockerfile Dockerfile.worker
 ```
-
-- No dashboard do Vercel, crie um novo projeto apontando para este repositório.
 
 2) Provisionar serviços externos
 
-- Postgres (audit + RAG/pgvector): usar Supabase ou Neon. Habilite a extensão `pgvector`.
-  - Se usar Supabase: crie um projeto, pegue a connection string (valor para `AUDIT_DB_URL` ou `PGVECTOR_URL`).
-  - Rode o script de bootstrap se necessário: `scripts/pgvector_bootstrap.sql`.
+- Postgres (audit + RAG/pgvector): use Supabase, Neon ou um Postgres gerenciado. Habilite `pgvector` se for usar RAG.
+  - Se usar Supabase: crie um projeto e pegue a connection string (`PGVECTOR_URL` / `AUDIT_DB_URL`).
+  - Rode os scripts SQL fornecidos (`pgvector_bootstrap.sql`) conforme necessário.
 
-- Redis (fila/streams): usar Upstash, Redis Cloud ou AWS Elasticache.
+- Redis (fila/streams): use Upstash, Redis Cloud ou AWS ElastiCache.
   - Obtenha `REDIS_URL` (ex.: `redis://:password@host:6379`).
 
-3) Configurar variáveis de ambiente no Vercel
+3) Configurar variáveis de ambiente no Render
 
-Use o painel do projeto em Settings → Environment Variables ou a CLI:
+Use o Dashboard do Render ou a CLI para aplicar variáveis de ambiente (recomendado: `render services env set`). Exemplo via CLI:
 
 ```bash
-vercel env add OPENAI_API_KEY production
-vercel env add NEXTAUTH_SECRET production
-vercel env add NEXTAUTH_URL production
-vercel env add GITHUB_ID production
-vercel env add GITHUB_SECRET production
-vercel env add REDIS_URL production
-vercel env add AUDIT_DB_URL production
-vercel env add PGVECTOR_URL production
+render services env set legacyguard-web OPENAI_API_KEY "sk-..."
+render services env set legacyguard-web NEXTAUTH_SECRET "..."
+render services env set legacyguard-web NEXTAUTH_URL "https://your-app.onrender.com"
+render services env set legacyguard-web GITHUB_ID "..."
+render services env set legacyguard-web GITHUB_SECRET "..."
+render services env set legacyguard-web REDIS_URL "redis://..."
+# repita para legacyguard-worker
 ```
 
-Substitua `production` por `preview`/`development` conforme necessário.
+4) Deploys
 
-4) Worker/background
+- Após configurar as `envs`, acione um deploy pela Dashboard ou CLI:
 
-Vercel não é ideal para processos long-running; recomendamos rodar o worker (`npm run worker`) em um serviço separado (Render, Fly, Cloud Run, ou um container Docker).
+```bash
+render deploys create <SERVICE_ID>
+render deploys list <SERVICE_ID>
+```
 
-- Exemplo rápido com Render (Docker):
-  - Crie um serviço no Render do tipo "Docker" apontando para este repo.
-  - Use o `Dockerfile.worker` presente no repo (vai instalar dependências e executar `npm run worker`).
-  - Configure as mesmas variáveis de ambiente no serviço do worker.
+5) Worker/background
 
-5) Boas práticas e notas
+Recomendamos executar o worker como um serviço dedicado no Render (Background Worker) ou como serviço Docker se usar imagens.
 
-- As `env` em `vercel.json` usam referências a secrets (`@NAME`) como marcador — você ainda deve adicionar os secrets no painel do Vercel.
+6) Boas práticas
+
 - Habilite backups e monitoramento no Postgres/Redis.
-- Se for usar pgvector, confirme o tamanho do embedding e o custo de pesquisa; recomenda-se usar embeddings assíncronos e batches.
+- Use tokens/segredos via `render services env set` ou `RENDER_API_KEY` para CI.
+- Revogue tokens antigos no dashboard.
 
-6) Comandos úteis para verificação local
+7) Verificações e comandos úteis
 
 ```bash
-# rodar app locally
-npm install
-npm run dev
-
-# rodar worker local (abre outro terminal)
-npm run worker
+render services list
+render services env list legacyguard-web
+render services env list legacyguard-worker
+render logs legacyguard-web
+render logs legacyguard-worker
 ```
 
-7) Arquivos criados
+8) Testes locais (antes do deploy)
 
-- `vercel.json` — mapear build e variáveis de ambiente (placeholders)
-- `.env.example` — template de variáveis de ambiente
-- `Dockerfile.worker` — container para executar o worker em serviços Docker-friendly
+Web:
+```bash
+npm ci
+npm run build
+npm run start
+# verificar http://localhost:3000
+```
+
+Worker:
+```bash
+npm run build:worker
+npm run start:worker
+```
+
+Segurança: não compartilhe chaves em chats. Use `render login` para autenticar interativamente ou `RENDER_API_KEY` em CI.

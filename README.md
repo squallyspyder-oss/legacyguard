@@ -294,7 +294,7 @@ curl -H "Authorization: Bearer $TOKEN" \
 - [x] Twin Builder (reprodução de incidentes)
 - [ ] Persistência de quotas por usuário
 - [ ] Dashboard de métricas
-- [ ] Integração com billing (Stripe/Vercel)
+- [ ] Integração com billing (Stripe)
 - [ ] Webhooks para notificações
 - [ ] Multi-tenancy
 
