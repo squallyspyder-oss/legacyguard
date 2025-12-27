@@ -109,6 +109,23 @@ export async function runExecutor(task: ExecutorInput): Promise<ExecutorOutput> 
   const octo = new Octokit({ auth: task.token });
   const { owner, repo, prNumber } = task;
 
+  // Ensure required GitHub identifiers are present
+  if (!owner || !repo || typeof prNumber !== 'number') {
+    const prNum = prNumber ?? -1;
+    return {
+      role: 'executor',
+      action: 'aborted',
+      merged: false,
+      prNumber: prNum,
+      prUrl: owner && repo && typeof prNumber === 'number' ? `https://github.com/${owner}/${repo}/pull/${prNumber}` : 'unknown',
+      validations,
+      reason: 'Missing owner/repo/prNumber for executor operation',
+      risks: ['Insufficient context for PR operations'],
+      rollbackPlan: 'N/A',
+      postMergeActions: [],
+    };
+  }
+
   // Buscar informações da PR
   let prData: any;
   try {
