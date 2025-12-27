@@ -6,6 +6,8 @@
   --accent: #5eead4;
   --accent-2: #a855f7;
   --muted: #8fa2c3;
+  --font-geist-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-geist-mono: "SFMono-Regular", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 @theme inline {

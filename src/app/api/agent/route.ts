@@ -7,10 +7,6 @@ import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function POST(req: NextRequest) {
   let tempDir: string | null = null;
   let semgrepResults = '';
@@ -19,6 +15,8 @@ export async function POST(req: NextRequest) {
   let message = 'Analise o código fornecido com foco em segurança e refatoração.';
   let githubUrl: string | null = null;
   let accessToken: string | undefined = undefined;
+  const apiKey = process.env.OPENAI_API_KEY;
+  const openai = apiKey ? new OpenAI({ apiKey }) : null;
 
   try {
     let body: any = null;
@@ -213,13 +211,16 @@ export async function POST(req: NextRequest) {
 
     let reply: string;
     try {
-      const completion = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        temperature: 0.5,
-        messages: [
-          {
-            role: 'system',
-            content: `Você é o LegacyGuard Agent.
+      if (!openai) {
+        reply = `**Modo simulado**\nSemgrep e npm audit executados.\nAdicione OPENAI_API_KEY para relatório completo.`;
+      } else {
+        const completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          temperature: 0.5,
+          messages: [
+            {
+              role: 'system',
+              content: `Você é o LegacyGuard Agent.
 
 Use os resultados do Semgrep e npm audit como base.
 Gere relatório claro com patches em \`\`\`diff quando houver vulnerabilidades.
@@ -230,12 +231,13 @@ Instruções para os testes:
 - Não altere outros arquivos diretamente aqui — apenas gere o conteúdo dos testes.
 Se for necessário, inclua sugestões de comandos para executar os testes.
 Seja profissional e priorize segurança.`
-          },
-          { role: 'user', content: fullPrompt },
-        ],
-      });
+            },
+            { role: 'user', content: fullPrompt },
+          ],
+        });
 
-      reply = completion.choices[0]?.message?.content?.trim() || 'Análise concluída.';
+        reply = completion.choices[0]?.message?.content?.trim() || 'Análise concluída.';
+      }
     } catch {
       reply = `**Modo simulado**\nSemgrep e npm audit executados.\nAdicione saldo na OpenAI para relatório completo.`;
     }
@@ -425,9 +427,3 @@ Seja profissional e priorize segurança.`
     if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};

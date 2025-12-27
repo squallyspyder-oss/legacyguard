@@ -59,9 +59,11 @@ export async function startAgentsConsumer() {
   // eslint-disable-next-line no-constant-condition
   while (true) {
     const res = await readGroup(STREAM, GROUP, CONSUMER, 10, 5000);
-    if (!res) continue;
+    if (!res || !Array.isArray(res)) continue;
+    const entries = res as [string, Array<[string, any]>][];
 
-    for (const [, messages] of res) {
+    for (const [, messages] of entries) {
+      if (!Array.isArray(messages)) continue;
       for (const msg of messages) {
         const id = msg[0];
         let attempts = 0;

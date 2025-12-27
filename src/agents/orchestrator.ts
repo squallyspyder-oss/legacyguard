@@ -13,7 +13,7 @@ import { analyzeImpact } from '../lib/impact';
 import { emitSandboxLog } from '../lib/sandbox-logs';
 import { startIncidentCycle, markMitigation, recordRegression } from '../lib/metrics';
 import { logEvent } from '../lib/audit';
-import { runSandbox, SandboxResult, getSandboxCapabilities } from '../lib/sandbox';
+import { runSandbox, SandboxResult, getSandboxCapabilities, HarnessCommands } from '../lib/sandbox';
 
 const execFileAsync = promisify(execFile);
 
@@ -21,7 +21,8 @@ type SandboxConfig = {
   enabled?: boolean;
   repoPath?: string;
   command?: string;
-  commands?: Array<{ name: string; command: string; notes?: string }>; // Harness commands from Twin
+  commands?: string[]; // Harness commands from Twin (flattened)
+  harnessCommands?: HarnessCommands;
   runnerPath?: string;
   timeoutMs?: number;
   failMode?: 'fail' | 'warn'; // fail = abort executor; warn = log and continuar
@@ -155,14 +156,19 @@ export class Orchestrator {
           this.log(`   🔧 Harness: ${twinResult.harness.commands.length} comandos sugeridos`);
           // Enriquecer sandbox config com harness commands
           if (this.taskContext.sandbox) {
-            this.taskContext.sandbox.commands = twinResult.harness.commands;
-            this.taskContext.sandbox.harnessCommands = {
-              run: twinResult.harness.commands,
-              setup: twinResult.harness.setup || [],
-              teardown: twinResult.harness.teardown || [],
-              env: twinResult.harness.env,
-              workdir: twinResult.harness.workdir,
-            };
+            const harnessCommands = twinResult.harness.commands
+              .map(cmd => cmd.command)
+              .filter((cmd): cmd is string => Boolean(cmd));
+            if (harnessCommands.length) {
+              this.taskContext.sandbox.commands = harnessCommands;
+              this.taskContext.sandbox.harnessCommands = {
+                run: harnessCommands,
+                setup: twinResult.harness.setup || [],
+                teardown: twinResult.harness.teardown || [],
+                env: twinResult.harness.env,
+                workdir: twinResult.harness.workdir,
+              };
+            }
           }
         }
 
@@ -393,6 +399,7 @@ export class Orchestrator {
           await this.runSandboxIfEnabled(task);
           result.output = await runOperator({
             ...this.taskContext,
+            repoPath: this.taskContext.repoPath || process.cwd(),
             action: task.description,
             dependencyContext: depContext,
           });
@@ -404,8 +411,16 @@ export class Orchestrator {
             throw new Error('Safe mode habilitado: executor bloqueado');
           }
           await this.runSandboxIfEnabled(task);
+          const { owner, repo, prNumber, token } = this.taskContext;
+          if (!owner || !repo || !prNumber || !token) {
+            throw new Error('Executor requer owner, repo, prNumber e token');
+          }
           result.output = await runExecutor({
             ...this.taskContext,
+            owner,
+            repo,
+            prNumber,
+            token,
             action: task.description,
             dependencyContext: depContext,
           });
