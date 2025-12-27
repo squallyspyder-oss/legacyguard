@@ -91,12 +91,13 @@ export async function runExecutor(task: ExecutorInput): Promise<ExecutorOutput> 
       metadata: { prNumber: task.prNumber, owner: task.owner, repo: task.repo },
     }).catch(() => undefined);
 
+    const prNum = task.prNumber ?? -1;
     return {
       role: 'executor',
       action: 'aborted',
       merged: false,
-      prNumber: task.prNumber,
-      prUrl: `https://github.com/${task.owner}/${task.repo}/pull/${task.prNumber}`,
+      prNumber: prNum,
+      prUrl: task.owner && task.repo && task.prNumber ? `https://github.com/${task.owner}/${task.repo}/pull/${task.prNumber}` : 'unknown',
       validations,
       reason: 'Token de autenticação ausente',
       risks: ['Operação não autorizada'],
@@ -116,12 +117,13 @@ export async function runExecutor(task: ExecutorInput): Promise<ExecutorOutput> 
     validations.prExists = true;
     validations.noConflicts = prData.mergeable === true;
   } catch (err: any) {
+    const prNum = prNumber ?? -1;
     return {
       role: 'executor',
       action: 'aborted',
       merged: false,
-      prNumber,
-      prUrl: `https://github.com/${owner}/${repo}/pull/${prNumber}`,
+      prNumber: prNum,
+      prUrl: owner && repo && prNumber ? `https://github.com/${owner}/${repo}/pull/${prNumber}` : 'unknown',
       validations,
       reason: `PR não encontrada: ${err?.message || err}`,
       risks: ['PR pode ter sido fechada ou deletada'],
