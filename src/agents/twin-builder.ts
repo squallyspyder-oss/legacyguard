@@ -32,6 +32,7 @@ export type TwinBuilderInput = {
     runnerPath?: string;
     command?: string;
     failMode?: 'fail' | 'warn';
+    languageHint?: string;
   };
 };
 
