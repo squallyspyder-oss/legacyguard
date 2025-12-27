@@ -169,7 +169,13 @@ export async function enforceQuota(params: {
     const nextTokens = prev.tokensUsed + tokens;
     const allowed = limits.hardCap ? nextTokens <= limits.monthlyTokens : true;
     if (!allowed) {
-      return { allowed: false, reason: 'quota_exceeded', tokensLimit: limits.monthlyTokens, tokensUsed: prev.tokensUsed };
+      return {
+        allowed: false,
+        reason: 'quota_exceeded',
+        tokensLimit: limits.monthlyTokens,
+        tokensUsed: prev.tokensUsed,
+        planId,
+      };
     }
     memoryUsage.set(key, { tokensUsed: nextTokens, usdUsed: prev.usdUsed + cost.usd });
     return { allowed: true, planId, tokensUsed: nextTokens, usdUsed: prev.usdUsed + cost.usd };
@@ -190,16 +196,17 @@ export async function enforceQuota(params: {
 
     const row = res.rows[0];
     const allowed = limits.hardCap ? Number(row.tokens_used) <= limits.monthlyTokens : true;
-    if (!allowed) {
-      await client.query('ROLLBACK');
-      return {
-        allowed: false,
-        reason: 'quota_exceeded',
-        tokensUsed: Number(row.tokens_used),
-        usdUsed: Number(row.usd_used),
-        tokensLimit: limits.monthlyTokens,
-      };
-    }
+      if (!allowed) {
+        await client.query('ROLLBACK');
+        return {
+          allowed: false,
+          reason: 'quota_exceeded',
+          tokensUsed: Number(row.tokens_used),
+          usdUsed: Number(row.usd_used),
+          tokensLimit: limits.monthlyTokens,
+          planId,
+        };
+      }
     await client.query('COMMIT');
     // record daily rollup
     try {
@@ -360,6 +367,38 @@ export async function getCircuitStatus() {
     return { tripped: Date.now() < (until || 0), until, thresholdUsd: Number(row?.threshold_usd || process.env.QUOTA_CIRCUIT_THRESHOLD_USD || 1000), pausedMs: Number(row?.paused_ms || process.env.QUOTA_CIRCUIT_PAUSE_MS || 600000) };
   } catch {
     return { tripped: isCircuitTripped(), until: circuitTrippedUntil, thresholdUsd: Number(process.env.QUOTA_CIRCUIT_THRESHOLD_USD || 1000), pausedMs: Number(process.env.QUOTA_CIRCUIT_PAUSE_MS || 600000) };
+  }
+}
+
+// Admin: reset circuit breaker immediately
+export async function resetCircuit(): Promise<boolean> {
+  const client = getPool();
+  circuitTrippedUntil = 0;
+  if (!client) return true;
+  try {
+    await client.query(`UPDATE circuit_state SET tripped_until = NULL, updated_at = NOW() WHERE id = 1`);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+// Admin: adjust user usage manually (tokens and USD deltas can be negative to refund)
+export async function adjustUserUsage(params: { userId: string; month: string; tokensDelta: number; usdDelta: number; day?: string; }): Promise<boolean> {
+  const client = getPool();
+  if (!client) return false;
+  try {
+    const { userId, month, tokensDelta, usdDelta, day } = params;
+    await client.query('BEGIN');
+    await client.query(`UPDATE user_usage SET tokens_used = GREATEST(tokens_used + $1,0), usd_used = GREATEST(usd_used + $2,0), updated_at = NOW() WHERE user_id = $3 AND month = $4`, [tokensDelta, usdDelta, userId, month]);
+    if (day) {
+      await client.query(`UPDATE user_usage_daily SET tokens_used = GREATEST(tokens_used + $1,0), usd_used = GREATEST(usd_used + $2,0), updated_at = NOW() WHERE user_id = $3 AND day = $4`, [tokensDelta, usdDelta, userId, day]);
+    }
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    return false;
   }
 }
 

@@ -122,6 +122,7 @@ export async function runPlanner(task: {
   request: string;
   context?: string;
   repoInfo?: { files: number; languages: string[] };
+  twinContext?: unknown;
 }): Promise<Plan> {
   // Modo mock para testes/offline: evita dependência de API externa
   if (process.env.LEGACYGUARD_PLANNER_MODE === 'mock' || (!process.env.OPENAI_API_KEY && process.env.NODE_ENV === 'test')) {
