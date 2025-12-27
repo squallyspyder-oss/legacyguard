@@ -147,7 +147,8 @@ async function findTestCommand(repoPath: string, languageHint?: string): Promise
 // Check if Docker is available
 async function isDockerAvailable(): Promise<boolean> {
   try {
-    await execAsync('docker version --format "{{.Server.Version}}"');
+    // Use a short timeout so tests and detection don't hang if Docker daemon is unresponsive
+    await execAsync('docker version --format "{{.Server.Version}}"', { timeout: 2000 });
     return true;
   } catch {
     return false;

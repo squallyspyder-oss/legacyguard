@@ -505,6 +505,20 @@ export class Orchestrator {
       return null;
     }
 
+    // Se um runnerPath foi fornecido mas não existe no FS, respeitar failMode
+    if (sandbox.runnerPath) {
+      try {
+        if (!fs.existsSync(sandbox.runnerPath)) {
+          const msg = `Sandbox runner não encontrado: ${sandbox.runnerPath}`;
+          this.log(msg);
+          if ((sandbox.failMode || 'fail') === 'fail') throw new Error(msg);
+          return null;
+        }
+      } catch {
+        // se houver erro em verificar, prosseguir e deixar runSandbox lidar com fallbacks
+      }
+    }
+
     // Em Windows sem WSL, o runner bash não funciona; falha ou apenas alerta conforme failMode
     const isWindows = process.platform === 'win32' && !process.env.WSL_DISTRO_NAME;
     if (isWindows) {
