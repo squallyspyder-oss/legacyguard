@@ -35,10 +35,10 @@ FORMATO DE RESPOSTA (JSON):
 }`;
 
 export type ExecutorInput = {
-  owner: string;
-  repo: string;
-  prNumber: number;
-  token: string;
+  owner?: string;
+  repo?: string;
+  prNumber?: number;
+  token?: string;
   action?: string;
   mergeMethod?: 'merge' | 'squash' | 'rebase';
   commitTitle?: string;
