@@ -303,7 +303,7 @@ async function runDockerSandbox(config: SandboxConfig): Promise<SandboxResult> {
       });
     });
 
-    proc.on('error', (err) => {
+    proc.on('error', (err: Error) => {
       clearTimeout(timeout);
       resolve({
         success: false,
