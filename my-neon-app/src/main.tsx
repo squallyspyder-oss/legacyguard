@@ -1,39 +1,17 @@
-import { StrictMode, Suspense, lazy } from 'react';
+import { NeonAuthUIProvider } from '@neondatabase/neon-js/auth/react';
+import '@neondatabase/neon-js/ui/css';
+import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import { NeonAuthUIProvider } from '@neondatabase/auth-ui';
-import './index.css';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
 import { authClient } from './lib/auth';
-
-const HomePage = lazy(() => import('./pages/home'));
-const AuthPage = lazy(() => import('./pages/auth'));
-const AccountPage = lazy(() => import('./pages/account'));
-
-function Loader() {
-  return <div style={{ padding: 24, textAlign: 'center' }}>Carregando…</div>;
-}
-
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <HomePage />,
-  },
-  {
-    path: '/auth',
-    element: <AuthPage />,
-  },
-  {
-    path: '/account',
-    element: <AccountPage />,
-  },
-]);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <NeonAuthUIProvider authClient={authClient}>
-      <Suspense fallback={<Loader />}>
-        <RouterProvider router={router} />
-      </Suspense>
+    <NeonAuthUIProvider emailOTP authClient={authClient}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </NeonAuthUIProvider>
-  </StrictMode>,
+  </StrictMode>
 );

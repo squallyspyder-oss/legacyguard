@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import './styles.css';
 
-export default function HomePage() {
+export function Home() {
   return (
     <main className="page">
       <section className="hero">
@@ -11,10 +11,10 @@ export default function HomePage() {
           Use o Neon Auth para gerenciar usuários, sessões e permissões com pgvector e Postgres.
         </p>
         <div className="actions">
-          <Link className="btn primary" to="/auth">
+          <Link className="btn primary" to="/auth/sign-in">
             Entrar ou criar conta
           </Link>
-          <Link className="btn ghost" to="/account">
+          <Link className="btn ghost" to="/account/settings">
             Minha conta
           </Link>
         </div>

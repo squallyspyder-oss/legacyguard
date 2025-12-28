@@ -1,7 +1,7 @@
-import { AuthView } from '@neondatabase/auth-ui';
+import { AuthView } from '@neondatabase/neon-js/ui/react';
 import './styles.css';
 
-export default function AuthPage() {
+export function Auth() {
   return (
     <main className="page">
       <section className="hero" style={{ maxWidth: 520 }}>

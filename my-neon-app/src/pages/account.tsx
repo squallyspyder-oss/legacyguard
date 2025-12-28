@@ -1,8 +1,8 @@
-import { AccountView, SignedOut } from '@neondatabase/auth-ui';
+import { AccountView, SignedOut } from '@neondatabase/neon-js/ui/react';
 import { Link } from 'react-router-dom';
 import './styles.css';
 
-export default function AccountPage() {
+export function Account() {
   return (
     <main className="page">
       <section className="hero" style={{ maxWidth: 720 }}>
@@ -11,7 +11,7 @@ export default function AccountPage() {
         <p className="lede">Gerencie credenciais, sessões, MFA e organizações fornecidas pelo Neon Auth.</p>
         <SignedOut>
           <p className="lede">
-            Você precisa estar autenticado. <Link className="btn primary" to="/auth">Ir para login</Link>
+            Você precisa estar autenticado. <Link className="btn primary" to="/auth/sign-in">Ir para login</Link>
           </p>
         </SignedOut>
         <AccountView view="SETTINGS" />
