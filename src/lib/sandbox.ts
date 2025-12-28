@@ -271,13 +271,13 @@ async function runDockerSandbox(config: SandboxConfig): Promise<SandboxResult> {
       proc.kill('SIGKILL');
     }, config.timeoutMs || 300000);
 
-    proc.stdout?.on('data', (data) => {
+    proc.stdout?.on('data', (data: Buffer) => {
       const str = data.toString();
       stdout += str;
       log(`[Sandbox/Docker] ${str.trim()}`);
     });
 
-    proc.stderr?.on('data', (data) => {
+    proc.stderr?.on('data', (data: Buffer) => {
       const str = data.toString();
       stderr += str;
       log(`[Sandbox/Docker] [stderr] ${str.trim()}`);
