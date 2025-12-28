@@ -113,7 +113,7 @@ async function main() {
 
   while (true) {
     try {
-      const res = await readGroup(stream, group, consumer, 1, 5000);
+      const res = await readGroup(stream, group, consumer, 1, 5000) as [string, [string, string[]][]][] | null;
       if (!res) continue;
 
       for (const [, items] of res) {
