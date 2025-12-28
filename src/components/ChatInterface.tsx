@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
-import ReactDiffViewer from 'react-diff-viewer-continued';
 import { useSession, signIn, signOut } from 'next-auth/react';
-import AgentSelector, { AGENT_ROLES } from './AgentSelector';
-import SettingsSidebar from './SettingsSidebar';
+import { AGENT_ROLES } from './AgentSelector';
+import ContextSidebar from './ContextSidebar';
+import GovernanceSidebar from './GovernanceSidebar';
+import ChatArea, { Message, Patch, TestFile } from './ChatArea';
+import OnboardingTour, { useOnboarding } from './OnboardingTour';
 
 type SessionItem = {
   id: string;
@@ -14,28 +16,6 @@ type SessionItem = {
   recency: string;
   risk: 'baixo' | 'medio' | 'alto';
 };
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  patches?: Patch[];
-  tests?: TestFile[];
-  approvalRequired?: string; // orchestrationId quando precisa aprovação
-  suggestOrchestrateText?: string; // quando chat sugere escalar para orquestração
-  twinOffer?: { prompt: string };
-  twinReady?: boolean;
-}
-
-interface Patch {
-  file: string;
-  original: string;
-  fixed: string;
-}
-
-interface TestFile {
-  file: string;
-  content: string;
-}
 
 export default function ChatInterface() {
   const { data: session, status } = useSession();
@@ -52,8 +32,6 @@ export default function ChatInterface() {
   const [githubUrl, setGithubUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [selectedPatch, setSelectedPatch] = useState<Patch | null>(null);
-  const [selectedTest, setSelectedTest] = useState<TestFile | null>(null);
   const [agentRole, setAgentRole] = useState<string>(AGENT_ROLES[0].key);
   const [deepSearch, setDeepSearch] = useState(false);
   const [mergeOwner, setMergeOwner] = useState('');
@@ -61,6 +39,14 @@ export default function ChatInterface() {
   const [mergePrNumber, setMergePrNumber] = useState('');
   const [mergeLoading, setMergeLoading] = useState(false);
   const [inlineSuggestions, setInlineSuggestions] = useState<string[]>([]);
+  
+  // Infrastructure status
+  const [workerStatus] = useState<'connected' | 'disconnected' | 'unknown'>('unknown');
+  const [sandboxStatus] = useState<'ready' | 'unavailable' | 'unknown'>('unknown');
+  const [ragProgress] = useState<number | undefined>(undefined);
+  
+  // Onboarding tour
+  const onboarding = useOnboarding(session?.user?.email ? `lg:${session.user.email}` : 'lg:anon');
 
   // Configurações gerais (sidebar controlada)
   const [sandboxEnabled, setSandboxEnabled] = useState(true);
@@ -806,424 +792,173 @@ export default function ChatInterface() {
 
   return (
     <div className="min-h-screen relative overflow-hidden bg-transparent text-slate-50">
+      {/* Background effects */}
       <div className="pointer-events-none absolute inset-0 mix-blend-screen opacity-60">
         <div className="absolute -left-32 -top-32 w-80 h-80 rounded-full bg-emerald-500 blur-[140px]" />
         <div className="absolute right-0 top-10 w-72 h-72 rounded-full bg-indigo-500 blur-[140px]" />
         <div className="absolute left-20 bottom-0 w-96 h-96 rounded-full bg-cyan-500 blur-[160px]" />
       </div>
 
-      <div className="relative max-w-7xl mx-auto px-4 py-8 grid lg:grid-cols-[320px,1fr] gap-4">
-        <SettingsSidebar
-          deepSearch={deepSearch}
-          onToggleDeep={setDeepSearch}
-          sandboxEnabled={sandboxEnabled}
-          onToggleSandbox={setSandboxEnabled}
-          sandboxMode={sandboxMode}
-          onChangeSandboxMode={setSandboxMode}
-          safeMode={safeMode}
-          onToggleSafeMode={setSafeMode}
-          reviewGate={reviewGate}
-          onToggleReviewGate={setReviewGate}
-          workerEnabled={workerEnabled}
-          onToggleWorker={setWorkerEnabled}
-          maskingEnabled={maskingEnabled}
-          onToggleMasking={setMaskingEnabled}
-          ragReady={ragReady}
-          onToggleRagReady={setRagReady}
-          apiEnabled={apiEnabled}
-          onToggleApi={setApiEnabled}
-          billingCap={billingCap}
-          onChangeBillingCap={setBillingCap}
-          tokenCap={tokenCap}
-          onChangeTokenCap={setTokenCap}
-          temperatureCap={temperatureCap}
-          onChangeTemperatureCap={setTemperatureCap}
-          sessions={sessions}
-          onResumeSession={handleResumeSession}
-          sessionsLoading={sessionsLoading}
-        />
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        isOpen={onboarding.showTour}
+        onClose={onboarding.closeTour}
+        onComplete={onboarding.completeTour}
+      />
 
-        <div className="flex flex-col gap-6">
-          <header className="glass rounded-2xl px-6 py-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-11 w-11 rounded-xl bg-emerald-400/20 border border-emerald-300/30 flex items-center justify-center text-xl">🛡️</div>
-              <div>
-                <h1 className="text-2xl font-bold text-white">LegacyGuard Console</h1>
-                <p className="text-sm text-slate-300">Orquestre agentes, teste em sandbox e revise segurança em um só lugar.</p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {safetyBadges.map((b, idx) => (
-                    <span key={idx} className="text-[11px] px-2 py-1 rounded-full bg-white/5 border border-white/10 text-slate-200">{b}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              {status === 'loading' && <span className="text-sm text-slate-300">Carregando sessão...</span>}
-              {status !== 'loading' && session?.user && (
-                <div className="flex items-center gap-3">
-                  {session.user.image && (
-                    <Image src={session.user.image} alt="Avatar" width={40} height={40} className="rounded-full border border-white/10" />
-                  )}
-                  <div className="text-right">
-                    <p className="text-sm font-semibold">{session.user.name || session.user.email}</p>
-                    <p className="text-xs text-emerald-200">GitHub conectado</p>
-                  </div>
-                  <button
-                    onClick={() => signOut({ callbackUrl: '/' })}
-                    className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 text-sm font-semibold transition"
-                  >
-                    Sair
-                  </button>
-                </div>
-              )}
-              {status !== 'loading' && !session?.user && (
-                <button
-                  onClick={() => signIn('github')}
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold shadow-lg shadow-emerald-500/30"
-                >
-                  Login com GitHub
-                </button>
-              )}
-            </div>
-          </header>
-
-          <div className="grid lg:grid-cols-[2fr,1fr] gap-4">
-            <div className="glass rounded-2xl p-4 flex flex-col gap-4 min-h-[75vh]">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-slate-300">Chat & Execução</p>
-                  <p className="text-lg font-semibold">Fale com os agentes e acompanhe a orquestração</p>
-                </div>
-                {isLoading && <span className="px-3 py-1 rounded-full bg-amber-400/15 text-amber-200 text-xs border border-amber-400/40">Processando...</span>}
-              </div>
-
-              {agentRole === 'legacyAssist' && (
-                <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 flex flex-col gap-3">
-                  <div className="flex flex-wrap items-center gap-2 justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-emerald-100">Modo Assistido ativo</p>
-                      <p className="text-xs text-emerald-200">Nenhuma execução automática. Siga os passos guiados e confirme antes de acionar agentes.</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 text-[11px] text-emerald-100">
-                      <span className="px-2 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40">Execução bloqueada</span>
-                      <span className="px-2 py-1 rounded-full bg-white/10 border border-white/20">Passos: {assistMetrics.stepsCompleted}</span>
-                      <span className="px-2 py-1 rounded-full bg-white/10 border border-white/20">Pesquisas: {assistMetrics.researches}</span>
-                    </div>
-                  </div>
-                  <div className="grid md:grid-cols-2 gap-2 text-xs text-emerald-50">
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">1) Entender → Confirme contexto (repo/riscos/prazo).</div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">2) Pesquisar → RAG interno, Web, Brainstorm curto.</div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">3) Incidente → Acione Twin Builder e gere harness.</div>
-                    <div className="rounded-lg border border-white/10 bg-white/5 p-3">4) Validar → Sandbox fail-mode antes de qualquer merge.</div>
-                  </div>
-                  <div className="flex flex-wrap gap-2 text-sm">
-                    <button onClick={() => handleAssistAction('rag')} className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15">🔍 RAG interno</button>
-                    <button onClick={() => handleAssistAction('web')} className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15">🌐 Buscar web</button>
-                    <button onClick={() => handleAssistAction('brainstorm')} className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15">💡 Brainstorm</button>
-                    <button onClick={() => handleAssistAction('twin')} className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15">🧪 Twin Builder</button>
-                    <button onClick={() => handleAssistAction('sandbox')} className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15">🛡️ Sandbox fail</button>
-                    <button onClick={() => handleAssistAction('orchestrate')} className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15">🎭 Orquestrar (plano)</button>
-                    <button onClick={() => setShowAssistModal(true)} className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 hover:bg-white/15">ℹ️ Ajuda do modo</button>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex-1 overflow-y-auto pr-1 space-y-4 rounded-xl border border-white/5 bg-black/10 p-3">
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div
-                      className={`max-w-3xl px-5 py-4 rounded-2xl shadow-sm border whitespace-pre-wrap leading-relaxed
-                        ${msg.role === 'user'
-                          ? 'bg-emerald-500/15 border-emerald-400/30 text-emerald-50'
-                          : 'bg-white/5 border-white/10 text-slate-100'}`}
-                    >
-                      <div dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br />') }} />
-
-                      {msg.twinOffer && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            onClick={() => triggerTwinBuilder(msg.twinOffer!.prompt)}
-                            disabled={isLoading}
-                            className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-50 text-sm disabled:opacity-50 hover:bg-emerald-500/30"
-                          >
-                            🚀 Acionar Twin Builder
-                          </button>
-                          <button
-                            onClick={() => setMessages(prev => [...prev, { role: 'assistant', content: 'Twin Builder não foi acionado desta vez.' }])}
-                            className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-slate-200 text-sm hover:bg-white/20"
-                          >
-                            Agora não
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Placeholder para rollback/guardrails UI */}
-                      {msg.twinReady && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <button
-                            onClick={() => setMessages(prev => [...prev, { role: 'assistant', content: 'Rollback preparado (placeholder).' }])}
-                            className="px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-400/40 text-amber-50 text-sm hover:bg-amber-500/30"
-                          >
-                            🛡️ Preparar rollback
-                          </button>
-                          <button
-                            onClick={() => setMessages(prev => [...prev, { role: 'assistant', content: 'Continuar sem rollback (placeholder).' }])}
-                            className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-slate-200 text-sm hover:bg-white/20"
-                          >
-                            Continuar sem rollback
-                          </button>
-                        </div>
-                      )}
-
-                      {msg.role === 'assistant' && msg.patches && msg.patches.length > 0 && (
-                        <div className="mt-5 space-y-3">
-                          <div className="flex items-center gap-2 text-emerald-200 text-sm font-semibold">
-                            <span>🛠️ Patches disponíveis</span>
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs">{msg.patches.length}</span>
-                          </div>
-                          {msg.patches.map((patch, idx) => (
-                            <div key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3 flex flex-col gap-3">
-                              <p className="font-medium text-sm">📄 {patch.file}</p>
-                              <div className="flex gap-2 flex-wrap">
-                                <button
-                                  onClick={() => setSelectedPatch(patch)}
-                                  className="px-3 py-2 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-50 text-sm hover:bg-indigo-500/30"
-                                >
-                                  👁️ Visualizar
-                                </button>
-                                <button
-                                  onClick={() => applyPatch(patch)}
-                                  disabled={isLoading}
-                                  className="px-3 py-2 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-50 text-sm disabled:opacity-50 hover:bg-emerald-500/30"
-                                >
-                                  ✅ Aplicar
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {msg.role === 'assistant' && msg.tests && msg.tests.length > 0 && (
-                        <div className="mt-5 space-y-3">
-                          <div className="flex items-center gap-2 text-cyan-200 text-sm font-semibold">
-                            <span>🧪 Testes gerados</span>
-                            <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-xs">{msg.tests.length}</span>
-                            {msg.tests.length > 1 && (
-                              <button
-                                onClick={() => downloadAllTests(msg.tests!)}
-                                className="ml-2 px-2 py-1 text-xs rounded-lg bg-white/5 hover:bg-white/10 border border-white/10"
-                              >
-                                ⬇️ Baixar todos
-                              </button>
-                            )}
-                          </div>
-                          {msg.tests.map((t, idx) => (
-                            <div key={idx} className="rounded-lg border border-white/10 bg-black/20 p-3 flex flex-col gap-3">
-                              <p className="font-medium text-sm">📄 {t.file}</p>
-                              <div className="flex gap-2 flex-wrap">
-                                <button
-                                  onClick={() => setSelectedTest(t)}
-                                  className="px-3 py-2 rounded-lg bg-indigo-500/20 border border-indigo-400/40 text-indigo-50 text-sm hover:bg-indigo-500/30"
-                                >
-                                  👁️ Visualizar
-                                </button>
-                                <button
-                                  onClick={() => downloadTest(t.file, t.content)}
-                                  className="px-3 py-2 rounded-lg bg-cyan-500/20 border border-cyan-400/40 text-cyan-50 text-sm hover:bg-cyan-500/30"
-                                >
-                                  ⬇️ Baixar
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {msg.role === 'assistant' && msg.approvalRequired && (
-                        <div className="mt-5">
-                          <button
-                            onClick={() => handleApproval(msg.approvalRequired!)}
-                            disabled={isLoading}
-                            className="px-4 py-3 rounded-lg bg-amber-500/20 border border-amber-400/50 text-amber-100 font-semibold disabled:opacity-50 animate-pulse"
-                          >
-                            ✅ Aprovar e continuar execução
-                          </button>
-                        </div>
-                      )}
-
-                      {msg.role === 'assistant' && msg.suggestOrchestrateText && (
-                        <div className="mt-4 p-3 rounded-lg border border-emerald-400/40 bg-emerald-500/10">
-                          <p className="text-sm text-emerald-100 font-semibold mb-2">Esta solicitação parece exigir agentes. Quer orquestrar?</p>
-                          <button
-                            onClick={() => handleOrchestrate(msg.suggestOrchestrateText!, { files: uploadedFiles.map(f => f.name) })}
-                            className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold"
-                          >
-                            Iniciar Orquestração
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {isLoading && messages.length === 0 && (
-                  <div className="text-sm text-slate-300">Processando repositório e gerando análise...</div>
-                )}
-              </div>
-
-              <form onSubmit={handleSubmit} className="space-y-3">
-                {uploadedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {uploadedFiles.map((file, i) => (
-                      <div key={i} className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs flex items-center gap-2">
-                        <span>{file.name}</span>
-                        <button type="button" onClick={() => removeFile(i)} className="text-rose-300 hover:text-rose-200">×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {inlineSuggestions.length > 0 && (
-                  <div className="flex flex-wrap gap-2 -mb-1">
-                    {inlineSuggestions.map((sug, idx) => (
-                      <button
-                        type="button"
-                        key={idx}
-                        onClick={() => setInput(prev => (prev.trim().length ? `${prev.trim()} ${sug}` : sug))}
-                        className="px-3 py-1 rounded-full bg-white/10 border border-white/15 text-[12px] text-slate-100 hover:bg-white/20"
-                      >
-                        {sug}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setInput(val);
-                      setInlineSuggestions(computeSuggestions(val));
-                    }}
-                    placeholder={agentRole === 'chat' ? 'Pergunte, pesquise, faça brainstorm...' : 'Peça análise, refatoração ou orquestração completa...'}
-                    className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/40"
-                    disabled={isLoading}
-                  />
-                  <input type="file" id="file-upload" multiple className="hidden" onChange={(e) => handleFileUpload(e.target.files)} />
-                  <label htmlFor="file-upload" className="px-3 py-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 text-lg">📎</label>
-                  <button
-                    type="submit"
-                    disabled={isLoading || (!input.trim() && uploadedFiles.length === 0)}
-                    className="px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold disabled:opacity-50 shadow-lg shadow-emerald-500/30"
-                  >
-                    Enviar
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="glass rounded-2xl p-4 space-y-4">
-                <AgentSelector value={agentRole} onChange={setAgentRole} />
-                {agentRole === 'chat' && (
-                  <div className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 px-3 py-2">
-                    <div>
-                      <p className="text-sm text-slate-100 font-semibold">Pesquisa profunda</p>
-                      <p className="text-xs text-slate-400">Ativa modelo mais caro + busca contextual</p>
-                    </div>
-                    <label className="inline-flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 accent-emerald-500"
-                        checked={deepSearch}
-                        onChange={(e) => setDeepSearch(e.target.checked)}
-                      />
-                      <span className="text-xs text-slate-200">Ligado</span>
-                    </label>
-                  </div>
-                )}
-                <div className="rounded-xl border border-white/5 bg-white/5 p-3 text-xs text-slate-300 leading-relaxed">
-                  <p className="font-semibold text-slate-100 mb-1">Dicas rápidas</p>
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Use Orquestrador para planos completos com aprovação.</li>
-                    <li>Habilite sandbox via contexto/ambiente para validar antes do executor.</li>
-                    <li>Importer repo público ou privado (login GitHub para privado).</li>
-                  </ul>
-                </div>
-              </div>
-
-              <div className="glass rounded-2xl p-4 space-y-3">
-                <p className="text-sm font-semibold text-white">Importar repositório</p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={githubUrl}
-                    onChange={(e) => setGithubUrl(e.target.value)}
-                    placeholder="https://github.com/user/repo"
-                    className="flex-1 px-3 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30"
-                    disabled={isLoading}
-                  />
-                  <button
-                    onClick={handleImportRepo}
-                    disabled={isLoading || !githubUrl.trim()}
-                    className="px-4 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-900 font-semibold disabled:opacity-50 shadow-md shadow-cyan-500/30"
-                  >
-                    Importar
-                  </button>
-                </div>
-                {!session && (
-                  <p className="text-xs text-slate-400">Faça login com GitHub para importar privados.</p>
-                )}
-              </div>
-
-              <div className="glass rounded-2xl p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-white">Merge (Executor)</p>
-                  {mergeLoading && <span className="text-xs text-amber-200">Solicitando...</span>}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <input
-                    type="text"
-                    value={mergeOwner}
-                    onChange={(e) => setMergeOwner(e.target.value)}
-                    placeholder="owner"
-                    className="flex-1 min-w-32 px-3 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30"
-                    disabled={isLoading}
-                  />
-                  <input
-                    type="text"
-                    value={mergeRepo}
-                    onChange={(e) => setMergeRepo(e.target.value)}
-                    placeholder="repo"
-                    className="flex-1 min-w-32 px-3 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30"
-                    disabled={isLoading}
-                  />
-                  <input
-                    type="text"
-                    value={mergePrNumber}
-                    onChange={(e) => setMergePrNumber(e.target.value)}
-                    placeholder="PR #"
-                    className="w-24 px-3 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30"
-                    disabled={isLoading}
-                  />
-                  <button
-                    onClick={handleMerge}
-                    disabled={mergeLoading || !mergeOwner.trim() || !mergeRepo.trim() || !mergePrNumber.trim()}
-                    className="px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold disabled:opacity-50 shadow-md shadow-amber-500/30"
-                  >
-                    Merge PR
-                  </button>
-                </div>
-                <p className="text-xs text-slate-400">Requer token GitHub com permissão de merge. Use com cautela.</p>
-              </div>
+      <div className="relative max-w-[1800px] mx-auto px-4 py-6">
+        {/* Header */}
+        <header className="glass rounded-2xl px-6 py-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="h-11 w-11 rounded-xl bg-emerald-400/20 border border-emerald-300/30 flex items-center justify-center text-xl">🛡️</div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">LegacyGuard Console</h1>
+              <p className="text-sm text-slate-300">Layout de 3 colunas: Contexto → Chat → Governança</p>
             </div>
           </div>
+
+          <div className="flex items-center gap-3">
+            {/* Tour Button */}
+            <button
+              onClick={onboarding.startTour}
+              className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-slate-200 transition-colors"
+            >
+              📖 Tour
+            </button>
+            
+            {status === 'loading' && <span className="text-sm text-slate-300">Carregando sessão...</span>}
+            {status !== 'loading' && session?.user && (
+              <div className="flex items-center gap-3">
+                {session.user.image && (
+                  <Image src={session.user.image} alt="Avatar" width={40} height={40} className="rounded-full border border-white/10" />
+                )}
+                <div className="text-right">
+                  <p className="text-sm font-semibold">{session.user.name || session.user.email}</p>
+                  <p className="text-xs text-emerald-200">GitHub conectado</p>
+                </div>
+                <button
+                  onClick={() => signOut({ callbackUrl: '/' })}
+                  className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/15 text-sm font-semibold transition"
+                >
+                  Sair
+                </button>
+              </div>
+            )}
+            {status !== 'loading' && !session?.user && (
+              <button
+                onClick={() => signIn('github')}
+                className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold shadow-lg shadow-emerald-500/30"
+              >
+                Login com GitHub
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Main 3-Column Layout */}
+        <div className="grid lg:grid-cols-[280px,1fr,300px] gap-4">
+          {/* Column 1: Context & History */}
+          <ContextSidebar
+            sessions={sessions}
+            sessionsLoading={sessionsLoading}
+            onResumeSession={handleResumeSession}
+            githubUrl={githubUrl}
+            onChangeGithubUrl={setGithubUrl}
+            onImportRepo={handleImportRepo}
+            isLoading={isLoading}
+            isLoggedIn={!!session?.user}
+            mergeOwner={mergeOwner}
+            onChangeMergeOwner={setMergeOwner}
+            mergeRepo={mergeRepo}
+            onChangeMergeRepo={setMergeRepo}
+            mergePrNumber={mergePrNumber}
+            onChangeMergePrNumber={setMergePrNumber}
+            onMerge={handleMerge}
+            mergeLoading={mergeLoading}
+          />
+
+          {/* Column 2: Chat & Orchestration */}
+          <div className="glass rounded-2xl p-4">
+            <ChatArea
+              messages={messages}
+              isLoading={isLoading}
+              agentRole={agentRole}
+              onChangeAgentRole={setAgentRole}
+              deepSearch={deepSearch}
+              onToggleDeepSearch={setDeepSearch}
+              input={input}
+              onChangeInput={(val) => {
+                setInput(val);
+                setInlineSuggestions(computeSuggestions(val));
+              }}
+              onSubmit={handleSubmit}
+              uploadedFiles={uploadedFiles}
+              onUploadFiles={handleFileUpload}
+              onRemoveFile={removeFile}
+              inlineSuggestions={inlineSuggestions}
+              onApplyPatch={applyPatch}
+              onDownloadTest={downloadTest}
+              onDownloadAllTests={downloadAllTests}
+              onApproval={handleApproval}
+              onOrchestrate={(text, ctx) => handleOrchestrate(text, ctx)}
+              onTriggerTwinBuilder={triggerTwinBuilder}
+              assistMetrics={assistMetrics}
+              onAssistAction={handleAssistAction}
+              onShowAssistHelp={() => setShowAssistModal(true)}
+              safetyBadges={safetyBadges}
+            />
+          </div>
+
+          {/* Column 3: Governance & Controls */}
+          <GovernanceSidebar
+            sandboxEnabled={sandboxEnabled}
+            onToggleSandbox={setSandboxEnabled}
+            sandboxMode={sandboxMode}
+            onChangeSandboxMode={setSandboxMode}
+            safeMode={safeMode}
+            onToggleSafeMode={setSafeMode}
+            reviewGate={reviewGate}
+            onToggleReviewGate={setReviewGate}
+            maskingEnabled={maskingEnabled}
+            onToggleMasking={setMaskingEnabled}
+            workerEnabled={workerEnabled}
+            onToggleWorker={setWorkerEnabled}
+            workerStatus={workerStatus}
+            sandboxStatus={sandboxStatus}
+            apiEnabled={apiEnabled}
+            onToggleApi={setApiEnabled}
+            deepSearch={deepSearch}
+            onToggleDeep={setDeepSearch}
+            temperatureCap={temperatureCap}
+            onChangeTemperatureCap={setTemperatureCap}
+            tokenCap={tokenCap}
+            onChangeTokenCap={setTokenCap}
+            billingCap={billingCap}
+            onChangeBillingCap={setBillingCap}
+            ragReady={ragReady}
+            onToggleRagReady={setRagReady}
+            ragProgress={ragProgress}
+            onReindex={async () => {
+              try {
+                const res = await fetch('/api/index', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({}),
+                });
+                if (res.ok) {
+                  const data = await res.json();
+                  setRagReady(true);
+                  setMessages(prev => [...prev, { role: 'assistant', content: `📚 RAG reindexado (${data.fileCount ?? 0} arquivos). Contexto pronto.` }]);
+                }
+              } catch {
+                setMessages(prev => [...prev, { role: 'assistant', content: '⚠️ Erro ao reindexar.' }]);
+              }
+            }}
+          />
         </div>
       </div>
 
+      {/* LegacyAssist Modal */}
       {showAssistModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => { setShowAssistModal(false); setAssistOnboardingSeen(true); }}>
           <div className="bg-slate-900 rounded-xl max-w-3xl w-full shadow-2xl border border-emerald-400/40" onClick={(e) => e.stopPropagation()}>
@@ -1244,75 +979,6 @@ export default function ChatInterface() {
             </div>
             <div className="p-6 border-t border-white/10 flex justify-end gap-3">
               <button onClick={() => { setShowAssistModal(false); setAssistOnboardingSeen(true); }} className="px-5 py-3 rounded-lg bg-white/10 border border-white/20 text-slate-200">Entendi, começar tour</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedPatch && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setSelectedPatch(null)}>
-          <div className="bg-slate-900 rounded-xl max-w-7xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-white/10" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-white/10 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-emerald-300">Preview do Patch: {selectedPatch.file}</h2>
-              <button onClick={() => setSelectedPatch(null)} className="text-3xl text-slate-300 hover:text-white">&times;</button>
-            </div>
-            <div className="flex-1 overflow-auto">
-              <ReactDiffViewer
-                oldValue={selectedPatch.original}
-                newValue={selectedPatch.fixed}
-                splitView={true}
-                useDarkTheme={true}
-                leftTitle="Código Original"
-                rightTitle="Código Corrigido"
-                styles={{
-                  contentText: { lineHeight: '1.6' },
-                  diffContainer: { fontFamily: 'monospace', fontSize: '14px' },
-                  line: { padding: '2px 4px' },
-                }}
-              />
-            </div>
-            <div className="p-6 border-t border-white/10 flex justify-end gap-4">
-              <button onClick={() => setSelectedPatch(null)} className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-medium border border-white/10">
-                Fechar
-              </button>
-              <button
-                onClick={() => {
-                  applyPatch(selectedPatch);
-                  setSelectedPatch(null);
-                }}
-                disabled={isLoading}
-                className="px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-900 rounded-lg font-semibold disabled:opacity-50"
-              >
-                Aplicar este Patch
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {selectedTest && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setSelectedTest(null)}>
-          <div className="bg-slate-900 rounded-xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-white/10" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b border-white/10 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-emerald-300">Preview do Teste: {selectedTest.file}</h2>
-              <button onClick={() => setSelectedTest(null)} className="text-3xl text-slate-300 hover:text-white">&times;</button>
-            </div>
-            <div className="flex-1 overflow-auto p-6">
-              <pre className="whitespace-pre-wrap font-mono text-sm text-slate-100">{selectedTest.content}</pre>
-            </div>
-            <div className="p-6 border-t border-white/10 flex justify-end gap-4">
-              <button onClick={() => setSelectedTest(null)} className="px-6 py-3 bg-white/5 hover:bg-white/10 rounded-lg font-medium border border-white/10">
-                Fechar
-              </button>
-              <button
-                onClick={() => {
-                  downloadTest(selectedTest.file, selectedTest.content);
-                  setSelectedTest(null);
-                }}
-                className="px-8 py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-900 rounded-lg font-semibold"
-              >
-                Baixar este Teste
-              </button>
             </div>
           </div>
         </div>
