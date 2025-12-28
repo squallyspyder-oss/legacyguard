@@ -267,7 +267,7 @@ async function execSandbox(runnerPath: string, repoPath: string, command: string
 
   try {
     await new Promise<void>((resolve, reject) => {
-      const child = getExecFile()('bash', [runnerPath, repoPathForRunner, command], { timeout: 10 * 60 * 1000 }, (err, stdout, stderr) => {
+      const child = getExecFile()('bash', [runnerPath, repoPathForRunner, command], { timeout: 10 * 60 * 1000 }, (err: Error | null, stdout: string, stderr: string) => {
         if (stdout) log(taskId, `Sandbox stdout: ${stdout.slice(0, 1000)}`, 'sandbox');
         if (stderr) log(taskId, `Sandbox stderr: ${stderr.slice(0, 1000)}`, 'sandbox');
         if (err) {
