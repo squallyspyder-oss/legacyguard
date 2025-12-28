@@ -340,8 +340,9 @@ export class Orchestrator {
       switch (task.agent) {
         case 'advisor':
           result.output = await runAdvisor({
-            ...this.taskContext,
+            repoPath: this.taskContext.repoPath,
             query: task.description,
+            twinContext: this.taskContext.twinResult,
             dependencyContext: depContext,
           });
           break;
@@ -386,9 +387,10 @@ export class Orchestrator {
 
           await this.runSandboxIfEnabled(task);
           result.output = await runOperator({
-            ...this.taskContext,
+            repoPath: this.taskContext.repoPath || '',
             action: task.description,
             dependencyContext: depContext,
+            twinContext: this.taskContext.twinResult,
           });
           break;
         }
@@ -399,8 +401,12 @@ export class Orchestrator {
           }
           await this.runSandboxIfEnabled(task);
           result.output = await runExecutor({
-            ...this.taskContext,
+            owner: this.taskContext.owner || '',
+            repo: this.taskContext.repo || '',
+            prNumber: this.taskContext.prNumber || 0,
+            token: this.taskContext.token || '',
             action: task.description,
+            twinContext: this.taskContext.twinResult,
             dependencyContext: depContext,
           });
           break;
