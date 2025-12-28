@@ -4,6 +4,30 @@ import { useState } from "react";
 import ReactDiffViewer from "react-diff-viewer-continued";
 import AgentSelector from "./AgentSelector";
 
+// HTML sanitization helper to prevent XSS
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Format message content safely - escapes HTML then applies safe transformations
+function formatMessageContent(content: string): string {
+  // For SSR safety, check if we're in browser
+  if (typeof document === 'undefined') {
+    // Server-side: just escape basic HTML entities
+    return content
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+      .replace(/\n/g, '<br />');
+  }
+  // Client-side: use DOM-based escaping
+  return escapeHtml(content).replace(/\n/g, '<br />');
+}
+
 export interface Message {
   role: "user" | "assistant";
   content: string;
@@ -364,7 +388,7 @@ function MessageBubble({
             : "bg-white/5 border-white/10 text-slate-100"
         }`}
       >
-        <div dangerouslySetInnerHTML={{ __html: message.content.replace(/\n/g, "<br />") }} />
+        <div dangerouslySetInnerHTML={{ __html: formatMessageContent(message.content) }} />
 
         {/* Twin Builder Offer */}
         {message.twinOffer && (

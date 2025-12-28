@@ -98,7 +98,6 @@ export default function GovernanceSidebar({
   };
 
   const securityScore = getSecurityScore();
-  const securityColor = securityScore >= 80 ? "emerald" : securityScore >= 50 ? "amber" : "rose";
 
   return (
     <aside className="glass rounded-2xl p-4 flex flex-col gap-4 h-full overflow-y-auto">
@@ -108,7 +107,13 @@ export default function GovernanceSidebar({
           <p className="text-sm font-semibold text-slate-100">Governança & Controles</p>
           <p className="text-xs text-slate-400">Guardrails de segurança</p>
         </div>
-        <div className={`text-[11px] px-2 py-1 rounded-full bg-${securityColor}-500/15 text-${securityColor}-200 border border-${securityColor}-400/30`}>
+        <div className={`text-[11px] px-2 py-1 rounded-full ${
+          securityScore >= 80 
+            ? "bg-emerald-500/15 text-emerald-200 border border-emerald-400/30"
+            : securityScore >= 50
+              ? "bg-amber-500/15 text-amber-200 border border-amber-400/30"
+              : "bg-rose-500/15 text-rose-200 border border-rose-400/30"
+        }`}>
           {securityScore}%
         </div>
       </div>

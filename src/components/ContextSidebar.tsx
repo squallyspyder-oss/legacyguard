@@ -196,6 +196,8 @@ export default function ContextSidebar({
                 value={mergeOwner}
                 onChange={(e) => onChangeMergeOwner(e.target.value)}
                 placeholder="owner"
+                pattern="^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?$"
+                title="GitHub username or organization name"
                 className="flex-1 min-w-[80px] px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30 text-sm"
                 disabled={isLoading}
               />
@@ -204,6 +206,8 @@ export default function ContextSidebar({
                 value={mergeRepo}
                 onChange={(e) => onChangeMergeRepo(e.target.value)}
                 placeholder="repo"
+                pattern="^[a-zA-Z0-9._-]+$"
+                title="GitHub repository name"
                 className="flex-1 min-w-[80px] px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30 text-sm"
                 disabled={isLoading}
               />
@@ -212,6 +216,8 @@ export default function ContextSidebar({
                 value={mergePrNumber}
                 onChange={(e) => onChangeMergePrNumber(e.target.value)}
                 placeholder="PR #"
+                pattern="^[0-9]+$"
+                title="Pull request number"
                 className="w-16 px-3 py-2 rounded-xl bg-white/5 border border-white/10 focus:border-emerald-400/60 focus:ring-2 focus:ring-emerald-500/30 text-sm"
                 disabled={isLoading}
               />

@@ -255,13 +255,26 @@ export default function OnboardingTour({ isOpen, onClose, onComplete }: Onboardi
 
 // Hook for managing onboarding state
 export function useOnboarding(storageKey: string) {
-  // Initialize from localStorage only on client side
-  const [hasSeenTour, setHasSeenTour] = useState(() => {
-    if (typeof window === 'undefined') return true; // SSR default
-    const seen = localStorage.getItem(`${storageKey}:tourComplete`);
-    return seen === "true";
-  });
+  // Start with SSR-safe defaults, then hydrate on client
+  const [hasSeenTour, setHasSeenTour] = useState(true); // SSR default
   const [showTour, setShowTour] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Hydrate from localStorage after mount (client-side only)
+  if (typeof window !== 'undefined' && !isHydrated) {
+    const seen = localStorage.getItem(`${storageKey}:tourComplete`);
+    if (seen !== null) {
+      // Only update if different from SSR default
+      const seenValue = seen === "true";
+      if (seenValue !== hasSeenTour) {
+        setHasSeenTour(seenValue);
+      }
+    } else {
+      // First time user - hasn't seen tour
+      setHasSeenTour(false);
+    }
+    setIsHydrated(true);
+  }
 
   const completeTour = () => {
     localStorage.setItem(`${storageKey}:tourComplete`, "true");
