@@ -431,8 +431,4 @@ Seja profissional e priorize segurança.`
   }
 }
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+export const runtime = 'nodejs';
