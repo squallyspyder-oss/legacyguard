@@ -7,9 +7,16 @@ import path from 'path';
 import os from 'os';
 import { execSync } from 'child_process';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazy-initialize OpenAI client to avoid build-time errors
+let openaiClient: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openaiClient;
+}
 
 export async function POST(req: NextRequest) {
   let tempDir: string | null = null;
@@ -213,7 +220,7 @@ export async function POST(req: NextRequest) {
 
     let reply: string;
     try {
-      const completion = await openai.chat.completions.create({
+      const completion = await getOpenAI().chat.completions.create({
         model: 'gpt-4o-mini',
         temperature: 0.5,
         messages: [
@@ -425,9 +432,3 @@ Seja profissional e priorize segurança.`
     if (tempDir) fs.rmSync(tempDir, { recursive: true, force: true });
   }
 }
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
