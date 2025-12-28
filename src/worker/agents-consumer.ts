@@ -61,7 +61,7 @@ export async function startAgentsConsumer() {
     const res = await readGroup(STREAM, GROUP, CONSUMER, 10, 5000);
     if (!res) continue;
 
-    for (const [, messages] of res) {
+    for (const [, messages] of res as [string, [string, string[]][]][]) {
       for (const msg of messages) {
         const id = msg[0];
         let attempts = 0;
