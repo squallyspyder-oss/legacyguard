@@ -18,8 +18,12 @@ import {
   Zap,
   HelpCircle,
   MoreHorizontal,
+  GitBranch,
+  FolderOpen,
 } from "lucide-react"
 import type { AppSettings, SessionItem } from "./MainLayout"
+import ImportRepoModal from "../repo/ImportRepoModal"
+import AuthModal from "../auth/AuthModal"
 
 interface SidebarProps {
   isOpen: boolean
@@ -36,6 +40,7 @@ interface SidebarProps {
   onOpenSettings: () => void
   onStartTour: () => void
   settings: AppSettings
+  onQuickAction?: (action: string) => void
 }
 
 export default function Sidebar({
@@ -53,9 +58,12 @@ export default function Sidebar({
   onOpenSettings,
   onStartTour,
   settings,
+  onQuickAction,
 }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [hoveredSession, setHoveredSession] = useState<string | null>(null)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
 
   const filteredSessions = sessions.filter(
     (s) =>
@@ -165,11 +173,36 @@ export default function Sidebar({
 
       {/* Quick Actions */}
       {expanded && (
-        <div className="px-3 pb-3">
+        <div className="px-3 pb-3 space-y-2">
+          {/* Import Repo Button */}
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl
+                     bg-secondary/50 border border-border text-muted-foreground
+                     hover:bg-secondary hover:text-foreground hover:border-primary/30
+                     transition-all duration-200 group"
+          >
+            <GitBranch className="w-4 h-4 group-hover:text-primary transition-colors" />
+            <span className="text-sm font-medium">Importar Repositório</span>
+          </button>
+          
+          {/* Quick Mode Buttons */}
           <div className="grid grid-cols-3 gap-1.5">
-            <QuickActionButton icon={<Sparkles className="w-3.5 h-3.5" />} label="Assist" />
-            <QuickActionButton icon={<Zap className="w-3.5 h-3.5" />} label="Orquest." />
-            <QuickActionButton icon={<Shield className="w-3.5 h-3.5" />} label="Sandbox" />
+            <QuickActionButton 
+              icon={<Sparkles className="w-3.5 h-3.5" />} 
+              label="Assist" 
+              onClick={() => onQuickAction?.("legacyAssist")}
+            />
+            <QuickActionButton 
+              icon={<Zap className="w-3.5 h-3.5" />} 
+              label="Orquest." 
+              onClick={() => onQuickAction?.("orchestrate")}
+            />
+            <QuickActionButton 
+              icon={<Shield className="w-3.5 h-3.5" />} 
+              label="Chat" 
+              onClick={() => onQuickAction?.("chat")}
+            />
           </div>
         </div>
       )}
@@ -325,7 +358,7 @@ export default function Sidebar({
             </button>
           ) : (
             <button
-              onClick={() => signIn("github")}
+              onClick={() => setShowAuthModal(true)}
               className={`
                 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg
                 bg-secondary hover:bg-secondary/80 transition-colors
@@ -333,11 +366,27 @@ export default function Sidebar({
               `}
             >
               <LogIn className="w-4 h-4 flex-shrink-0" />
-              {expanded && <span className="text-sm font-medium">Entrar com GitHub</span>}
+              {expanded && <span className="text-sm font-medium">Entrar / Cadastrar</span>}
             </button>
           )}
         </div>
       </div>
+
+      {/* Import Repo Modal */}
+      <ImportRepoModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportComplete={(repoInfo) => {
+          console.log("Repo imported:", repoInfo)
+          // TODO: Update app state with imported repo
+        }}
+      />
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+      />
     </aside>
   )
 }
@@ -380,9 +429,10 @@ function NavItem({
   )
 }
 
-function QuickActionButton({ icon, label }: { icon: React.ReactNode; label: string }) {
+function QuickActionButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
   return (
     <button
+      onClick={onClick}
       className="flex flex-col items-center gap-1 p-2 rounded-lg
                  bg-sidebar-accent/30 hover:bg-sidebar-accent border border-transparent hover:border-sidebar-border
                  transition-all duration-200 group"

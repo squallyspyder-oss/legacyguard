@@ -141,20 +141,138 @@ export default function ChatContainer({
     setShowSuggestions(false)
     setIsLoading(true)
 
-    // Simulate API response
-    setTimeout(() => {
-      const roleInfo = AGENT_ROLES.find((r) => r.key === agentRole)
+    try {
+      // LegacyAssist mode - guided flow (local processing)
+      if (agentRole === "legacyAssist") {
+        const roleInfo = AGENT_ROLES.find((r) => r.key === agentRole)
+        const assistantMessage: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: "assistant",
+          content: buildResponse(userText, agentRole, roleInfo?.label || ""),
+          timestamp: new Date(),
+          agentRole,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+        setIsLoading(false)
+        setUploadedFiles([])
+        return
+      }
+
+      // Chat mode - call /api/chat
+      if (agentRole === "chat") {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            message: userText, 
+            deepSearch: settings.deepSearch 
+          }),
+        })
+        
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({ error: "Erro no servidor" }))
+          throw new Error(error.error || "Erro ao processar chat")
+        }
+        
+        const data = await res.json()
+        const assistantMessage: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: "assistant",
+          content: data.reply || "Sem resposta do servidor.",
+          timestamp: new Date(),
+          agentRole,
+          suggestOrchestrateText: data.suggestOrchestrate ? userText : undefined,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+        setIsLoading(false)
+        setUploadedFiles([])
+        return
+      }
+
+      // Orchestrate mode - call /api/agents
+      if (agentRole === "orchestrate") {
+        if (!settings.workerEnabled) {
+          const assistantMessage: Message = {
+            id: `msg-${Date.now() + 1}`,
+            role: "assistant",
+            content: "⚠️ **Worker desativado.** Ative o Worker nas configurações para usar o modo Orquestração.",
+            timestamp: new Date(),
+            agentRole,
+          }
+          setMessages((prev) => [...prev, assistantMessage])
+          setIsLoading(false)
+          return
+        }
+
+        const res = await fetch("/api/agents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role: "orchestrate",
+            message: userText,
+            sandbox: settings.sandboxEnabled ? { mode: settings.sandboxMode } : undefined,
+            safeMode: settings.safeMode,
+          }),
+        })
+
+        if (!res.ok) {
+          const error = await res.json().catch(() => ({ error: "Erro no servidor" }))
+          throw new Error(error.error || "Erro ao iniciar orquestração")
+        }
+
+        const data = await res.json()
+        const assistantMessage: Message = {
+          id: `msg-${Date.now() + 1}`,
+          role: "assistant",
+          content: data.reply || `🚀 **Orquestração iniciada**\n\nID: \`${data.orchestrationId || "pending"}\`\n\nAcompanhe o progresso em tempo real.`,
+          timestamp: new Date(),
+          agentRole,
+          approvalRequired: data.requiresApproval ? data.orchestrationId : undefined,
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+        setIsLoading(false)
+        setUploadedFiles([])
+        return
+      }
+
+      // Other agent modes - call /api/agent with FormData
+      const formData = new FormData()
+      formData.append("message", userText)
+      formData.append("role", agentRole)
+      uploadedFiles.forEach((file) => formData.append("files", file))
+
+      const res = await fetch("/api/agent", { method: "POST", body: formData })
+      
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ error: "Erro no servidor" }))
+        throw new Error(error.error || "Erro ao processar")
+      }
+
+      const data = await res.json()
       const assistantMessage: Message = {
         id: `msg-${Date.now() + 1}`,
         role: "assistant",
-        content: buildResponse(userText, agentRole, roleInfo?.label || ""),
+        content: data.reply || "Processamento concluído.",
+        timestamp: new Date(),
+        agentRole,
+        patches: data.patches,
+        tests: data.tests,
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Erro desconhecido"
+      const assistantMessage: Message = {
+        id: `msg-${Date.now() + 1}`,
+        role: "assistant",
+        content: `❌ **Erro:** ${errorMessage}\n\nTente novamente ou verifique as configurações.`,
         timestamp: new Date(),
         agentRole,
       }
       setMessages((prev) => [...prev, assistantMessage])
+    } finally {
       setIsLoading(false)
       setUploadedFiles([])
-    }, 1500)
+    }
   }
 
   const handleSuggestionClick = (suggestion: string) => {
