@@ -26,7 +26,7 @@ export default function AuthModal({ isOpen, onClose, mode = "login" }: AuthModal
       <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50 animate-scale-in">
         <div className="bg-card border border-border rounded-2xl shadow-2xl overflow-hidden">
           {/* Header */}
-          <div className="relative px-6 pt-8 pb-6 text-center border-b border-border bg-gradient-to-b from-primary/5 to-transparent">
+          <div className="relative px-6 pt-8 pb-6 text-center border-b border-border bg-linear-to-b from-primary/5 to-transparent">
             <button
               onClick={onClose}
               className="absolute right-4 top-4 p-2 rounded-lg hover:bg-secondary transition-colors"

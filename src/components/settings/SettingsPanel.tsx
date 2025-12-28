@@ -807,9 +807,9 @@ function BestPracticeItem({ text, checked }: { text: string; checked?: boolean }
   return (
     <div className="flex items-center gap-2 text-sm">
       {checked ? (
-        <Check className="w-4 h-4 text-primary flex-shrink-0" />
+        <Check className="w-4 h-4 text-primary shrink-0" />
       ) : (
-        <div className="w-4 h-4 rounded-full border border-muted-foreground flex-shrink-0" />
+        <div className="w-4 h-4 rounded-full border border-muted-foreground shrink-0" />
       )}
       <span className={checked ? "text-foreground" : "text-muted-foreground"}>{text}</span>
     </div>

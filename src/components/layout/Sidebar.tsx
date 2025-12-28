@@ -100,7 +100,7 @@ export default function Sidebar({
     <aside
       className={`
         ${isMobile ? "fixed inset-y-0 left-0 z-50 w-80" : "relative"}
-        ${!isMobile && isCollapsed ? "w-[68px]" : "w-72"}
+        ${!isMobile && isCollapsed ? "w-17" : "w-72"}
         flex flex-col bg-sidebar border-r border-sidebar-border
         transition-all duration-300 ease-in-out
         ${isMobile ? "animate-slide-in-left" : ""}
@@ -111,7 +111,7 @@ export default function Sidebar({
         {expanded ? (
           <>
             <div className="flex items-center gap-3">
-              <Logo className="h-8 w-8 flex-shrink-0 animate-logo-glow" />
+              <Logo className="h-8 w-8 shrink-0 animate-logo-glow" />
               <div className="min-w-0">
                 <h1 className="font-bold text-base tracking-tight">LegacyGuard</h1>
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Security Platform</p>
@@ -148,7 +148,7 @@ export default function Sidebar({
             ${!expanded && "justify-center px-2"}
           `}
         >
-          <Plus className="w-5 h-5 flex-shrink-0 group-hover:rotate-90 transition-transform duration-200" />
+          <Plus className="w-5 h-5 shrink-0 group-hover:rotate-90 transition-transform duration-200" />
           {expanded && <span className="text-sm font-semibold">Nova conversa</span>}
         </button>
       </div>
@@ -339,10 +339,10 @@ export default function Sidebar({
                 <img
                   src={session.user.image || "/placeholder.svg"}
                   alt=""
-                  className="w-8 h-8 rounded-full flex-shrink-0 ring-2 ring-primary/20"
+                  className="w-8 h-8 rounded-full shrink-0 ring-2 ring-primary/20"
                 />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                   <span className="text-sm font-semibold text-primary">{session.user.name?.charAt(0) || "U"}</span>
                 </div>
               )}
@@ -365,7 +365,7 @@ export default function Sidebar({
                 ${!expanded && "justify-center px-2"}
               `}
             >
-              <LogIn className="w-4 h-4 flex-shrink-0" />
+              <LogIn className="w-4 h-4 shrink-0" />
               {expanded && <span className="text-sm font-medium">Entrar / Cadastrar</span>}
             </button>
           )}
@@ -416,7 +416,7 @@ function NavItem({
         ${!expanded && "justify-center px-2"}
       `}
     >
-      <span className="flex-shrink-0">{icon}</span>
+      <span className="shrink-0">{icon}</span>
       {expanded && (
         <>
           <span className="text-sm flex-1 text-left">{label}</span>
