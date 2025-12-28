@@ -47,7 +47,7 @@ type GithubRepo = {
 }
 
 export default function ImportRepoModal({ isOpen, onClose, onImportComplete }: ImportRepoModalProps) {
-  const { data: session, status: sessionStatus } = useSession()
+  const { status: sessionStatus } = useSession()
   const [mode, setMode] = useState<ImportMode>("url")
   const [status, setStatus] = useState<ImportStatus>("idle")
   const [error, setError] = useState<string | null>(null)
@@ -66,6 +66,38 @@ export default function ImportRepoModal({ isOpen, onClose, onImportComplete }: I
   const [localFiles, setLocalFiles] = useState<File[]>([])
   const [localPath, setLocalPath] = useState("")
 
+  // All hooks must be called before any conditional return
+  const loadGithubRepos = useCallback(async () => {
+    setGhLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/github/repos")
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || "Falha ao listar repositórios")
+      }
+      const data = await res.json()
+      setGhRepos(data.repos || [])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro desconhecido")
+    } finally {
+      setGhLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isOpen && mode === "github" && sessionStatus === "authenticated" && ghRepos.length === 0 && !ghLoading) {
+      loadGithubRepos()
+    }
+  }, [isOpen, mode, sessionStatus, ghRepos.length, ghLoading, loadGithubRepos])
+
+  const filteredRepos = useMemo(() => {
+    if (!ghSearch.trim()) return ghRepos
+    const q = ghSearch.toLowerCase()
+    return ghRepos.filter((r) => r.fullName.toLowerCase().includes(q))
+  }, [ghRepos, ghSearch])
+
+  // Early return AFTER all hooks
   if (!isOpen) return null
 
   const resetForm = () => {
@@ -280,36 +312,6 @@ export default function ImportRepoModal({ isOpen, onClose, onImportComplete }: I
         break
     }
   }
-
-  const loadGithubRepos = useCallback(async () => {
-    setGhLoading(true)
-    setError(null)
-    try {
-      const res = await fetch("/api/github/repos")
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error || "Falha ao listar repositórios")
-      }
-      const data = await res.json()
-      setGhRepos(data.repos || [])
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro desconhecido")
-    } finally {
-      setGhLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (mode === "github" && sessionStatus === "authenticated" && ghRepos.length === 0 && !ghLoading) {
-      loadGithubRepos()
-    }
-  }, [mode, sessionStatus, ghRepos.length, ghLoading, loadGithubRepos])
-
-  const filteredRepos = useMemo(() => {
-    if (!ghSearch.trim()) return ghRepos
-    const q = ghSearch.toLowerCase()
-    return ghRepos.filter((r) => r.fullName.toLowerCase().includes(q))
-  }, [ghRepos, ghSearch])
 
   const handleGithubClone = async (repo: GithubRepo) => {
     setStatus("loading")
