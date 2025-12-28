@@ -63,11 +63,11 @@ export async function enqueueTask(stream: string, data: Record<string, any>) {
   return r.xadd(stream, '*', ...flat);
 }
 
-export async function readGroup(stream: string, group: string, consumer: string, count = 1, block = 5000) {
+export async function readGroup(stream: string, group: string, consumer: string, count = 1, block = 5000): Promise<[string, [string, string[]][]][] | null> {
   const r = connectRedis();
   // XREADGROUP GROUP <group> <consumer> COUNT <count> BLOCK <ms> STREAMS <stream> >
   const res = await r.xreadgroup('GROUP', group, consumer, 'COUNT', count, 'BLOCK', block, 'STREAMS', stream, '>');
-  return res; // raw response to be parsed by caller
+  return res as [string, [string, string[]][]][] | null; // raw response to be parsed by caller
 }
 
 export async function ack(stream: string, group: string, id: string) {
