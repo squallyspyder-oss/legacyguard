@@ -76,26 +76,22 @@ export async function POST(req: NextRequest) {
     }
 
     // === Semgrep ===
-    if (process.env.VERCEL) {
-      semgrepResults += `### ⚠️ Semgrep/exec skipped on Vercel (native binaries unavailable)\n`;
-    } else {
-      try {
-        const output = getExecSync()( `npx semgrep scan --config=auto --quiet --json "${tempDir}"`, { timeout: 120000 } ).toString();
-        const results = JSON.parse(output);
-        const findings = results.results || [];
+    try {
+      const output = getExecSync()( `npx semgrep scan --config=auto --quiet --json "${tempDir}"`, { timeout: 120000 } ).toString();
+      const results = JSON.parse(output);
+      const findings = results.results || [];
 
-        if (findings.length > 0) {
-          semgrepResults += `### ⚠️ ${findings.length} Vulnerabilidade(s) no Código Fonte (Semgrep)\n\n`;
-          for (const f of findings.slice(0, 20)) {
-            semgrepResults += `**${(f.extra.severity || 'info').toUpperCase()}** — ${f.extra.message}\n`;
-            semgrepResults += `📄 \`${f.path}\` (linha ${f.start.line})\n\n`;
-          }
-        } else {
-          semgrepResults += `### ✅ Nenhuma vulnerabilidade no código fonte detectada\n`;
+      if (findings.length > 0) {
+        semgrepResults += `### ⚠️ ${findings.length} Vulnerabilidade(s) no Código Fonte (Semgrep)\n\n`;
+        for (const f of findings.slice(0, 20)) {
+          semgrepResults += `**${(f.extra.severity || 'info').toUpperCase()}** — ${f.extra.message}\n`;
+          semgrepResults += `📄 \`${f.path}\` (linha ${f.start.line})\n\n`;
         }
-      } catch {
-        semgrepResults += `### ⚠️ Falha no Semgrep — continuando com análise geral\n`;
+      } else {
+        semgrepResults += `### ✅ Nenhuma vulnerabilidade no código fonte detectada\n`;
       }
+    } catch {
+      semgrepResults += `### ⚠️ Falha no Semgrep — continuando com análise geral\n`;
     }
 
     // === Checks de Compliance (GDPR/SOC2) básicos ===
@@ -154,7 +150,6 @@ export async function POST(req: NextRequest) {
       if (hasPackageJson) {
         console.log('Executando npm audit...');
         try {
-          if (process.env.VERCEL) throw new Error('Skipped on Vercel');
           const auditOutput = getExecSync()(`npm audit --json`, { cwd: tempDir, timeout: 60000 }).toString();
           const audit = JSON.parse(auditOutput);
           const vulns = audit.metadata.vulnerabilities;
@@ -168,13 +163,12 @@ export async function POST(req: NextRequest) {
             depVulnResults += `### ✅ Nenhuma vulnerabilidade em dependências npm\n`;
           }
         } catch (npmError: any) {
-          depVulnResults += `### ⚠️ npm audit falhou ou foi pulado no ambiente (Vercel)\n`;
+          depVulnResults += `### ⚠️ npm audit falhou\n`;
         }
       }
 
       if (hasRequirementsTxt) {
         try {
-          if (process.env.VERCEL) throw new Error('Skipped on Vercel');
           getExecSync()(`pip install pip-audit`, { stdio: 'ignore' });
           const auditOutput = getExecSync()(`pip-audit --json`, { cwd: tempDir }).toString();
           const audit = JSON.parse(auditOutput);
@@ -187,7 +181,7 @@ export async function POST(req: NextRequest) {
             depVulnResults += `### ✅ Nenhuma vulnerabilidade em pacotes Python\n`;
           }
         } catch {
-          depVulnResults += `### ⚠️ pip-audit não disponível ou pulado no ambiente (Vercel)\n`;
+          depVulnResults += `### ⚠️ pip-audit não disponível\n`;
         }
       }
 

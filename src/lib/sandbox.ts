@@ -467,19 +467,7 @@ async function runNativeSandbox(config: SandboxConfig): Promise<SandboxResult> {
 export async function runSandbox(config: SandboxConfig): Promise<SandboxResult> {
   const log = config.onLog || console.log;
   
-  // Prevent sandbox execution in restricted hosting environments (like Vercel).
-  // Vercel does not allow spawning Docker or long-running host processes — force-disable unless explicitly forced.
-  if (process.env.VERCEL && process.env.LEGACYGUARD_FORCE_DOCKER !== 'true') {
-    log('[Sandbox] Running on Vercel — sandbox disabled for safety');
-    return {
-      success: true,
-      exitCode: 0,
-      stdout: 'Sandbox disabled on Vercel',
-      stderr: '',
-      durationMs: 0,
-      method: 'native',
-    };
-  }
+
   if (!config.enabled) {
     log('[Sandbox] Disabled, skipping');
     return {

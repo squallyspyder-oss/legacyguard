@@ -264,12 +264,6 @@ async function execSandbox(runnerPath: string, repoPath: string, command: string
   const repoPathForRunner = toDockerPath(repoPath);
   log(taskId, `Executando runner sandbox: ${runnerPath} (${command})`, 'sandbox');
 
-  if (process.env.VERCEL) {
-    log(taskId, 'ExecSandbox pulado no ambiente Vercel (sem suporte a Docker/processos nativos)', 'sandbox');
-    if (failMode === 'fail') throw new Error('Sandbox não suportado em Vercel');
-    return;
-  }
-
   try {
     await new Promise<void>((resolve, reject) => {
       const child = getExecFile()('bash', [runnerPath, repoPathForRunner, command], { timeout: 10 * 60 * 1000 }, (err, stdout, stderr) => {
