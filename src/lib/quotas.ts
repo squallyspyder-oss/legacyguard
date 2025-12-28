@@ -198,6 +198,7 @@ export async function enforceQuota(params: {
         tokensUsed: Number(row.tokens_used),
         usdUsed: Number(row.usd_used),
         tokensLimit: limits.monthlyTokens,
+        planId,
       };
     }
     await client.query('COMMIT');
