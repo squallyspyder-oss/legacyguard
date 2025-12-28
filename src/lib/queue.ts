@@ -137,7 +137,7 @@ export async function sendToDLQ(
   data: Record<string, any>,
   error: string,
   finalAttempt: number
-): Promise<string> {
+): Promise<string | null> {
   const dlqEntry = {
     ...data,
     _dlqReason: error,
