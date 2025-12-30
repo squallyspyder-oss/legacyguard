@@ -1,7 +1,8 @@
 import OpenAI from 'openai';
 import { estimateCostUSD } from '../lib/pricing';
+import { detectIntent, detectModeChangeRequest, formatSuggestion, type IntentDetectionResult } from '../lib/intent-detector';
 
-// Sinais fortes de necessidade de agentes (ação/execução)
+// Sinais fortes de necessidade de agentes (ação/execução) - legado, mantido para compatibilidade
 const ACTION_REGEX = /(aplica(r)?|patch|pr\b|pull request|merge|deploy|commit|test(e|ar)?|corrig(e|ir)|fix|ajustar|refator|automatiza|executa|rodar? testes|cria(r)? plano|orquestra)/i;
 
 type ChatOutput = {
@@ -15,6 +16,9 @@ type ChatOutput = {
     totalTokens: number;
     usdEstimate: number;
   };
+  // Novo: detecção de intenção ("vibe code")
+  intentDetection?: IntentDetectionResult;
+  modeSuggestion?: string;  // Texto formatado para mostrar ao usuário
 };
 
 export async function runChat(input: {
@@ -22,6 +26,7 @@ export async function runChat(input: {
   deep?: boolean;
   repoPath?: string;
   context?: string;
+  currentMode?: string;  // Modo atual para comparar
 }): Promise<ChatOutput> {
   const cheapModel = process.env.OPENAI_CHEAP_MODEL || 'gpt-4o-mini';
   const deepModel = process.env.OPENAI_DEEP_MODEL || 'gpt-4o';
@@ -29,6 +34,17 @@ export async function runChat(input: {
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   console.log('[chat] agent invoked', { deep: !!input.deep });
+
+  // Detectar intenção do usuário ("vibe code")
+  const intentDetection = detectIntent(input.message, input.currentMode);
+  const modeChangeRequest = detectModeChangeRequest(input.message);
+  
+  console.log('[chat] intent detection', { 
+    intent: intentDetection.intent, 
+    confidence: intentDetection.confidence,
+    suggestedMode: intentDetection.suggestedMode,
+    modeChangeRequest: modeChangeRequest.wantsChange,
+  });
 
   const system = input.deep
     ? `Você é o modo Chat Livre (profundo) do LegacyGuard. Responda de forma objetiva, traga riscos, opções e próximos passos. Quando perceber intenção de execução (patch, PR, merge, testes, deploy), recomende orquestrar agentes.`
@@ -67,11 +83,18 @@ export async function runChat(input: {
     throw new Error(`OpenAI chat failed: ${err?.message || err}`);
   }
 
+  // Gerar sugestão de mudança de modo se apropriado
+  const modeSuggestion = intentDetection.shouldPromptUser 
+    ? formatSuggestion(intentDetection) 
+    : undefined;
+
   return {
     reply,
-    suggestOrchestrate: needsAction,
+    suggestOrchestrate: needsAction || intentDetection.intent !== 'research',
     costTier: input.deep ? 'deep' : 'cheap',
     modelUsed: model,
     usage: usageInfo,
+    intentDetection,
+    modeSuggestion,
   };
 }
