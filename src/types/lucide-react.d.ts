@@ -38,6 +38,8 @@ declare module "lucide-react" {
   export const Terminal: LucideIcon
   export const RefreshCw: LucideIcon
   export const Shield: LucideIcon
+  export const HardDrive: LucideIcon
+  export const Database: LucideIcon
   export const DollarSign: LucideIcon
   export const Info: LucideIcon
   export const Check: LucideIcon
